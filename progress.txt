@@ -1,0 +1,99 @@
+PromptSmith Development Progress
+================================
+
+Phase 1: Foundation — CLI Only [COMPLETE]
+-----------------------------------------
+
+Completed:
+  [x] CLI scaffolding in Go (cobra framework)
+  [x] Local SQLite database schema
+  [x] Core commands: init, add, commit, log
+  [x] Prompt file parsing (YAML frontmatter + Mustache)
+  [x] Pre-commit secret scanning with warnings
+
+Files created:
+  cli/
+  ├── main.go                     # Entry point
+  ├── go.mod                      # Go module
+  ├── go.sum                      # Dependencies
+  ├── cmd/
+  │   ├── root.go                 # Root command, flags
+  │   ├── init.go                 # promptsmith init
+  │   ├── add.go                  # promptsmith add <file>
+  │   ├── commit.go               # promptsmith commit -m "msg"
+  │   └── log.go                  # promptsmith log
+  └── internal/
+      ├── db/
+      │   └── db.go               # SQLite database layer
+      ├── prompt/
+      │   └── parser.go           # YAML frontmatter + Mustache parsing
+      └── scanner/
+          └── secrets.go          # Secret/credential detection
+
+Commands implemented:
+  promptsmith init [name]         Initialize project, create .promptsmith/
+  promptsmith add <file>          Track a prompt file
+  promptsmith commit -m "msg"     Create new version for changed prompts
+  promptsmith log [-p name]       Show version history
+
+Database schema (SQLite):
+  - projects: id, name, timestamps
+  - prompts: id, project_id, name, description, file_path
+  - prompt_versions: id, prompt_id, version (semver), content, variables, metadata, parent_version_id, commit_message
+  - tags: id, prompt_id, version_id, name
+  - test_suites, test_runs, benchmarks, benchmark_runs (schema ready for Phase 3-4)
+
+Secret scanning detects:
+  - AWS keys, GitHub/GitLab tokens
+  - OpenAI, Anthropic, Google API keys
+  - Slack, Stripe tokens
+  - Private keys, database URLs
+  - Generic secrets (api_key=, password=, etc.)
+
+
+Phase 2: Version Control [NOT STARTED]
+--------------------------------------
+  [ ] Full versioning with branching
+  [ ] Diff algorithm (CLI output)
+  [ ] Tags and environment management
+  [ ] CLI commands: diff, tag, checkout
+  [ ] Basic web UI scaffolding (Next.js)
+
+
+Phase 3: Testing [NOT STARTED]
+------------------------------
+  [ ] Test suite definition format
+  [ ] Assertion types implementation
+  [ ] Test runner (CLI and web)
+  [ ] CI integration (GitHub Actions)
+
+
+Phase 4: LLM Features [NOT STARTED]
+-----------------------------------
+  [ ] Multi-provider integration
+  [ ] Variation generation
+  [ ] Benchmark execution
+  [ ] Results visualization
+
+
+Phase 5: Polish & Launch [NOT STARTED]
+--------------------------------------
+  [ ] Cloud sync functionality
+  [ ] Team collaboration features
+  [ ] Documentation site
+  [ ] Public launch
+
+
+Build & Test
+------------
+  cd cli
+  go build -o promptsmith .
+  ./promptsmith --help
+
+  # Test flow:
+  mkdir /tmp/test && cd /tmp/test
+  /path/to/promptsmith init my-project
+  echo "Hello {{name}}" > prompts/greeting.prompt
+  /path/to/promptsmith add prompts/greeting.prompt
+  /path/to/promptsmith commit -m "Add greeting"
+  /path/to/promptsmith log
