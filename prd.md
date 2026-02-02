@@ -245,7 +245,7 @@ promptsmith benchmark compare report-jan.json report-feb.json
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | **Web App** | Next.js 14+ (App Router) | Full-stack React, API routes, edge-ready |
-| **CLI** | Go | Fast startup, single binary, excellent DX |
+| **CLI** | Go | Fast startup, single binary distribution, excellent DX |
 | **Database** | SQLite (local) / Turso (cloud) | Zero-config local, seamless cloud sync |
 | **Auth** | NextAuth.js | GitHub/Google OAuth, simple setup |
 | **LLM Integration** | Vercel AI SDK | Unified interface, streaming support |
@@ -338,9 +338,6 @@ brew install promptsmith/tap/promptsmith
 
 # Go install
 go install github.com/promptsmith/cli@latest
-
-# npm (TypeScript alternative)
-npm install -g @promptsmith/cli
 ```
 
 ### Command Reference
@@ -398,6 +395,10 @@ providers:
     api_key_env: ANTHROPIC_API_KEY
   google:
     api_key_env: GOOGLE_API_KEY
+
+embeddings:
+  provider: openai  # openai, anthropic, or ollama
+  model: text-embedding-3-small
 
 sync:
   remote: https://app.promptsmith.dev
@@ -527,6 +528,15 @@ POST   /api/generate/expand         Expand prompt
 | Azure OpenAI | GPT-4 variants | P2 |
 | Local | Ollama, LM Studio | P2 |
 
+### Embedding Providers (for semantic similarity)
+
+| Provider | Model | Cost | Notes |
+|----------|-------|------|-------|
+| OpenAI | `text-embedding-3-small` | $0.02/1M tokens | Default, good quality/cost ratio |
+| OpenAI | `text-embedding-3-large` | $0.13/1M tokens | Higher quality |
+| Anthropic | `voyage-3-lite` (via partnership) | $0.02/1M tokens | Alternative cloud option |
+| Local | Ollama `nomic-embed-text` | Free | Offline/privacy use cases |
+
 ### Unified Interface
 
 ```typescript
@@ -567,17 +577,19 @@ interface CompletionResponse {
 
 ## Milestones & Timeline
 
-### Phase 1: Foundation (Weeks 1-4)
-- [ ] Project scaffolding (Next.js, database schema)
-- [ ] Basic CRUD for prompts and versions
-- [ ] CLI skeleton with `init`, `add`, `commit`
-- [ ] Simple web UI for prompt management
+### Phase 1: Foundation — CLI Only (Weeks 1-4)
+- [ ] CLI scaffolding in Go
+- [ ] Local SQLite database schema
+- [ ] Core commands: `init`, `add`, `commit`, `log`
+- [ ] Prompt file parsing (YAML frontmatter + Mustache)
+- [ ] Pre-commit secret scanning with warnings
 
 ### Phase 2: Version Control (Weeks 5-8)
 - [ ] Full versioning with branching
-- [ ] Diff algorithm and visualization
+- [ ] Diff algorithm (CLI output)
 - [ ] Tags and environment management
-- [ ] CLI commands: `diff`, `log`, `tag`, `checkout`
+- [ ] CLI commands: `diff`, `tag`, `checkout`
+- [ ] Basic web UI scaffolding (Next.js)
 
 ### Phase 3: Testing (Weeks 9-12)
 - [ ] Test suite definition format
@@ -630,12 +642,18 @@ interface CompletionResponse {
 
 ---
 
+## Resolved Decisions
+
+1. **Pricing model**: Fully open source — no commercial intent
+2. **Prompt format**: YAML frontmatter + Mustache templates
+3. **CLI language**: Go (single binary, fast startup)
+4. **Embedding provider**: OpenAI `text-embedding-3-small` default, Anthropic and Ollama as alternatives
+5. **Secrets/PII handling**: Pre-commit scanning with warnings for detected secrets
+
 ## Open Questions
 
-1. **Pricing model**: Open source core + cloud tier? Or fully open source with enterprise features?
-2. **Prompt format**: Invent new format or support existing (YAML, Jinja, Mustache)?
-3. **Collaboration**: Real-time editing or async PR-style workflows?
-4. **IDE extensions**: VS Code extension priority?
+1. **Collaboration**: Real-time editing or async PR-style workflows?
+2. **IDE extensions**: VS Code extension priority?
 
 ---
 
