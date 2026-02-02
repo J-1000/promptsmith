@@ -2,7 +2,7 @@
 When building frontend components or UI, read and apply the skill at `.claude/skills/frontend-design.md`
 
 ## UI
-When builging the UI check if the immplementation is correct in the following way:
+When building the UI check if the implementation is correct in the following way:
 1. run: npx expo start --web
 2. run: node scripts/screenshot.js http://localhost:8081 screenshot.png
 3. read the screenshot with the Read tool to check the UI
