@@ -1,0 +1,9 @@
+# Binary
+promptsmith
+
+# Test output
+*.test
+
+# IDE
+.idea/
+.vscode/
