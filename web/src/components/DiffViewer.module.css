@@ -1,0 +1,110 @@
+.container {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.headerText {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.headerText code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.diffContent {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.line {
+  display: flex;
+  min-height: 24px;
+}
+
+.lineNumber {
+  width: 48px;
+  padding: 0 8px;
+  text-align: right;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-right: 1px solid var(--border-subtle);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.linePrefix {
+  width: 24px;
+  padding: 0 8px;
+  text-align: center;
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.lineContent {
+  flex: 1;
+  padding: 0 16px 0 8px;
+  white-space: pre;
+}
+
+/* Hunk header */
+.hunk {
+  background: var(--bg-tertiary);
+  color: var(--info);
+}
+
+.hunk .lineNumber {
+  background: var(--bg-tertiary);
+}
+
+.hunk .lineContent {
+  padding-left: 80px;
+}
+
+/* Added lines */
+.added {
+  background: var(--diff-added-bg);
+}
+
+.added .lineNumber {
+  background: rgba(34, 84, 61, 0.5);
+  color: var(--diff-added-text);
+}
+
+.added .linePrefix {
+  color: var(--diff-added-text);
+}
+
+.added .lineContent {
+  color: var(--diff-added-text);
+}
+
+/* Removed lines */
+.removed {
+  background: var(--diff-removed-bg);
+}
+
+.removed .lineNumber {
+  background: rgba(127, 29, 29, 0.5);
+  color: var(--diff-removed-text);
+}
+
+.removed .linePrefix {
+  color: var(--diff-removed-text);
+}
+
+.removed .lineContent {
+  color: var(--diff-removed-text);
+}
