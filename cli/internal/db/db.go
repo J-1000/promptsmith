@@ -414,6 +414,89 @@ func (db *DB) GetVersionByID(id string) (*PromptVersion, error) {
 	return &v, nil
 }
 
+func (db *DB) CreateTag(promptID, versionID, name string) (*Tag, error) {
+	// Check if tag already exists
+	existing, err := db.GetTagByName(promptID, name)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		// Update existing tag to point to new version
+		_, err := db.Exec("UPDATE tags SET version_id = ? WHERE id = ?", versionID, existing.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to update tag: %w", err)
+		}
+		existing.VersionID = versionID
+		return existing, nil
+	}
+
+	tag := &Tag{
+		ID:        NewUUID(),
+		PromptID:  promptID,
+		VersionID: versionID,
+		Name:      name,
+		CreatedAt: time.Now(),
+	}
+
+	_, err = db.Exec(
+		"INSERT INTO tags (id, prompt_id, version_id, name, created_at) VALUES (?, ?, ?, ?, ?)",
+		tag.ID, tag.PromptID, tag.VersionID, tag.Name, tag.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create tag: %w", err)
+	}
+
+	return tag, nil
+}
+
+func (db *DB) GetTagByName(promptID, name string) (*Tag, error) {
+	var tag Tag
+	err := db.QueryRow(
+		"SELECT id, prompt_id, version_id, name, created_at FROM tags WHERE prompt_id = ? AND name = ?",
+		promptID, name,
+	).Scan(&tag.ID, &tag.PromptID, &tag.VersionID, &tag.Name, &tag.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &tag, nil
+}
+
+func (db *DB) ListTags(promptID string) ([]*Tag, error) {
+	rows, err := db.Query(
+		"SELECT id, prompt_id, version_id, name, created_at FROM tags WHERE prompt_id = ? ORDER BY name",
+		promptID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []*Tag
+	for rows.Next() {
+		var t Tag
+		if err := rows.Scan(&t.ID, &t.PromptID, &t.VersionID, &t.Name, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		tags = append(tags, &t)
+	}
+	return tags, nil
+}
+
+func (db *DB) DeleteTag(promptID, name string) error {
+	result, err := db.Exec("DELETE FROM tags WHERE prompt_id = ? AND name = ?", promptID, name)
+	if err != nil {
+		return fmt.Errorf("failed to delete tag: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("tag '%s' not found", name)
+	}
+	return nil
+}
+
 func (db *DB) GetAllVersionsForLog() ([]struct {
 	Prompt  *Prompt
 	Version *PromptVersion
