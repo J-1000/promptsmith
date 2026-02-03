@@ -68,6 +68,12 @@ promptsmith log
 | `promptsmith commit -m "msg"` | Create new version for changed prompts |
 | `promptsmith log` | Show version history |
 | `promptsmith log -p <name>` | Show history for specific prompt |
+| `promptsmith diff <prompt> [v1] [v2]` | Compare versions (unified diff) |
+| `promptsmith tag <prompt> <name> [ver]` | Create named version tag |
+| `promptsmith tag <prompt> --list` | List all tags |
+| `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
+
+Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
 ### Global Flags
 
@@ -137,10 +143,25 @@ Detected patterns:
 - Database URLs
 - Generic secrets (`api_key=`, `password=`, etc.)
 
+## Web UI
+
+PromptSmith includes a web interface for browsing prompts and viewing version history.
+
+```bash
+cd web
+npm install
+npm run dev    # http://localhost:8081
+```
+
+Features:
+- Prompt list with version badges and tags
+- Version history with commit messages
+- Unified diff viewer for comparing versions
+
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
-- [ ] **Phase 2**: Diff, tags, branching, web UI
+- [x] **Phase 2**: Diff, tags, web UI (branching in progress)
 - [ ] **Phase 3**: Testing framework
 - [ ] **Phase 4**: Multi-model benchmarking
 - [ ] **Phase 5**: Cloud sync, collaboration
