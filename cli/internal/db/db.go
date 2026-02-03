@@ -374,6 +374,46 @@ func (db *DB) ListVersions(promptID string) ([]*PromptVersion, error) {
 	return versions, nil
 }
 
+func (db *DB) GetVersionByString(promptID, version string) (*PromptVersion, error) {
+	var v PromptVersion
+	var parentID sql.NullString
+	err := db.QueryRow(
+		`SELECT id, prompt_id, version, content, variables, metadata, parent_version_id, commit_message, created_at, created_by
+		FROM prompt_versions WHERE prompt_id = ? AND version = ?`,
+		promptID, version,
+	).Scan(&v.ID, &v.PromptID, &v.Version, &v.Content, &v.Variables, &v.Metadata, &parentID, &v.CommitMessage, &v.CreatedAt, &v.CreatedBy)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if parentID.Valid {
+		v.ParentVersionID = &parentID.String
+	}
+	return &v, nil
+}
+
+func (db *DB) GetVersionByID(id string) (*PromptVersion, error) {
+	var v PromptVersion
+	var parentID sql.NullString
+	err := db.QueryRow(
+		`SELECT id, prompt_id, version, content, variables, metadata, parent_version_id, commit_message, created_at, created_by
+		FROM prompt_versions WHERE id = ?`,
+		id,
+	).Scan(&v.ID, &v.PromptID, &v.Version, &v.Content, &v.Variables, &v.Metadata, &parentID, &v.CommitMessage, &v.CreatedAt, &v.CreatedBy)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if parentID.Valid {
+		v.ParentVersionID = &parentID.String
+	}
+	return &v, nil
+}
+
 func (db *DB) GetAllVersionsForLog() ([]struct {
 	Prompt  *Prompt
 	Version *PromptVersion
