@@ -9,8 +9,8 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Version Control** — Git-like versioning with semantic versions (`prompt@1.2.3`)
 - **Prompt Parsing** — YAML frontmatter + Mustache templates
 - **Secret Scanning** — Detects API keys and credentials before commit
-- **Testing** — Define test suites with assertions (coming soon)
-- **Benchmarking** — Compare prompts across models (coming soon)
+- **Testing** — Define test suites with 15+ assertion types
+- **Benchmarking** — Compare prompts across OpenAI and Anthropic models
 
 ## Installation
 
@@ -73,6 +73,7 @@ promptsmith log
 | `promptsmith tag <prompt> --list` | List all tags |
 | `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
 | `promptsmith test [files...]` | Run test suites |
+| `promptsmith benchmark [files...]` | Run model benchmarks |
 
 Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
@@ -120,8 +121,8 @@ my-project/
 │   ├── config.yaml      # Project configuration
 │   └── promptsmith.db   # Version database (gitignored)
 ├── prompts/             # Your prompt files
-├── tests/               # Test definitions (coming soon)
-└── benchmarks/          # Benchmark configs (coming soon)
+├── tests/               # Test suite definitions
+└── benchmarks/          # Benchmark configurations
 ```
 
 ## Testing
@@ -181,6 +182,42 @@ promptsmith test --version 1.0.0    # Test specific version
 | `max_lines` | Maximum line count |
 | `word_count` | Exact word count |
 
+## Benchmarking
+
+Compare prompt performance across different LLM providers:
+
+```yaml
+# benchmarks/summarizer.bench.yaml
+name: summarizer-benchmark
+prompt: summarizer
+models:
+  - gpt-4o
+  - gpt-4o-mini
+  - claude-sonnet
+runs_per_model: 5
+```
+
+Run benchmarks:
+
+```bash
+promptsmith benchmark                              # Run all benchmarks
+promptsmith benchmark --models gpt-4o,claude-sonnet
+promptsmith benchmark --runs 10                    # 10 runs per model
+promptsmith benchmark -o results.json              # Save results
+```
+
+Benchmark output shows latency percentiles (p50, p99), token usage, cost per request, and recommendations for best speed/cost models.
+
+### Supported Models
+
+**OpenAI**: gpt-4o, gpt-4o-mini, gpt-4-turbo, o1, o1-mini
+
+**Anthropic**: claude-sonnet, claude-haiku, claude-opus (and dated versions)
+
+Set API keys via environment variables:
+- `OPENAI_API_KEY`
+- `ANTHROPIC_API_KEY`
+
 ## Secret Scanning
 
 PromptSmith warns you about potential secrets before committing:
@@ -203,25 +240,27 @@ Detected patterns:
 
 ## Web UI
 
-PromptSmith includes a web interface for browsing prompts and viewing version history.
+PromptSmith includes a web interface for browsing prompts and managing tests/benchmarks.
 
 ```bash
 cd web
 npm install
-npm run dev    # http://localhost:8081
+npm run dev    # http://localhost:5173
 ```
 
 Features:
 - Prompt list with version badges and tags
 - Version history with commit messages
 - Unified diff viewer for comparing versions
+- Test results dashboard with pass/fail indicators
+- Benchmark results with model comparison table
 
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
-- [x] **Phase 2**: Diff, tags, web UI
-- [x] **Phase 3**: Testing framework (CLI complete, web UI in progress)
-- [ ] **Phase 4**: Multi-model benchmarking
+- [x] **Phase 2**: Diff, tags, web UI scaffolding
+- [x] **Phase 3**: Testing framework with 15+ assertion types
+- [x] **Phase 4**: Multi-model benchmarking (OpenAI, Anthropic)
 - [ ] **Phase 5**: Cloud sync, collaboration
 
 ## License
