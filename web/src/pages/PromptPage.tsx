@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { DiffViewer } from '../components/DiffViewer'
 import { TestResults, SuiteResult } from '../components/TestResults'
 import { BenchmarkResults, BenchmarkResult } from '../components/BenchmarkResults'
+import { GeneratePanel, GenerateResult, GenerationType } from '../components/GeneratePanel'
 import styles from './PromptPage.module.css'
 
 // Mock data - will be replaced with CLI/API integration
@@ -168,11 +169,13 @@ const mockBenchmarkResults: BenchmarkResult = {
 export function PromptPage() {
   const { name } = useParams<{ name: string }>()
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
-  const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests' | 'benchmarks'>('content')
+  const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests' | 'benchmarks' | 'generate'>('content')
   const [testResults, setTestResults] = useState<SuiteResult | null>(mockTestResults)
   const [isRunningTests, setIsRunningTests] = useState(false)
   const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult | null>(mockBenchmarkResults)
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false)
+  const [generateResults, setGenerateResults] = useState<GenerateResult | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const handleRunTests = () => {
     setIsRunningTests(true)
@@ -190,6 +193,25 @@ export function PromptPage() {
       setBenchmarkResults(mockBenchmarkResults)
       setIsRunningBenchmark(false)
     }, 2000)
+  }
+
+  const handleGenerate = (type: GenerationType, count: number, goal: string) => {
+    setIsGenerating(true)
+    // Simulate generating variations
+    setTimeout(() => {
+      setGenerateResults({
+        original: mockContent,
+        variations: Array.from({ length: count }, (_, i) => ({
+          content: `Variation ${i + 1} of the prompt with ${type} applied.${goal ? ` Goal: ${goal}` : ''}`,
+          description: `${type.charAt(0).toUpperCase() + type.slice(1)} variation ${i + 1}`,
+          tokenDelta: type === 'compress' ? -(10 + i * 5) : type === 'expand' ? (15 + i * 8) : 0,
+        })),
+        model: 'gpt-4o-mini',
+        type,
+        goal: goal || undefined,
+      })
+      setIsGenerating(false)
+    }, 1500)
   }
 
   const toggleVersion = (version: string) => {
@@ -257,6 +279,12 @@ export function PromptPage() {
               </span>
             )}
           </button>
+          <button
+            className={`${styles.tab} ${view === 'generate' ? styles.tabActive : ''}`}
+            onClick={() => setView('generate')}
+          >
+            Generate
+          </button>
         </div>
       </div>
 
@@ -322,6 +350,14 @@ export function PromptPage() {
             results={benchmarkResults}
             onRunBenchmark={handleRunBenchmark}
             isRunning={isRunningBenchmark}
+          />
+        )}
+
+        {view === 'generate' && (
+          <GeneratePanel
+            results={generateResults}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
           />
         )}
       </div>

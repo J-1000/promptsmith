@@ -115,4 +115,32 @@ describe('PromptPage', () => {
     // gpt-4o-mini should be recommended (fastest and cheapest in mock data)
     expect(screen.getByText('gpt-4o-mini (best latency & cost)')).toBeInTheDocument()
   })
+
+  it('renders generate tab', () => {
+    renderWithRouter('/prompt/greeting')
+    expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument()
+  })
+
+  it('switches to generate view when tab clicked', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await user.click(screen.getByRole('button', { name: /generate/i }))
+
+    // Should show generate controls
+    expect(screen.getByText('Generate variations of your prompt using AI')).toBeInTheDocument()
+  })
+
+  it('shows generation type buttons in generate view', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await user.click(screen.getByRole('button', { name: /^generate$/i }))
+
+    // Should show type buttons
+    expect(screen.getByRole('button', { name: 'variations' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'compress' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'expand' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'rephrase' })).toBeInTheDocument()
+  })
 })
