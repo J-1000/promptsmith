@@ -162,6 +162,8 @@ Run tests:
 promptsmith test                    # Run all tests in tests/
 promptsmith test --filter "basic"   # Run matching tests
 promptsmith test --version 1.0.0    # Test specific version
+promptsmith test --live             # Run with real LLM (requires API key)
+promptsmith test --live --model gpt-4o  # Use specific model
 ```
 
 ### Assertion Types
