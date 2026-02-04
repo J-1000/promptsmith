@@ -72,6 +72,7 @@ promptsmith log
 | `promptsmith tag <prompt> <name> [ver]` | Create named version tag |
 | `promptsmith tag <prompt> --list` | List all tags |
 | `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
+| `promptsmith test [files...]` | Run test suites |
 
 Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
@@ -123,6 +124,63 @@ my-project/
 └── benchmarks/          # Benchmark configs (coming soon)
 ```
 
+## Testing
+
+Define test suites in YAML to validate your prompts:
+
+```yaml
+# tests/summarizer.test.yaml
+name: summarizer-tests
+prompt: summarizer
+tests:
+  - name: basic-output
+    inputs:
+      article: "AI is transforming industries."
+      max_points: 3
+    assertions:
+      - type: not_empty
+      - type: max_length
+        value: 500
+      - type: min_lines
+        value: 3
+
+  - name: json-format
+    inputs:
+      article: "Test article"
+    assertions:
+      - type: json_valid
+      - type: json_path
+        path: "summary"
+```
+
+Run tests:
+
+```bash
+promptsmith test                    # Run all tests in tests/
+promptsmith test --filter "basic"   # Run matching tests
+promptsmith test --version 1.0.0    # Test specific version
+```
+
+### Assertion Types
+
+| Type | Description |
+|------|-------------|
+| `contains` | Output contains value |
+| `not_contains` | Output doesn't contain value |
+| `equals` | Output matches exactly |
+| `matches` | Output matches regex |
+| `starts_with` | Output starts with value |
+| `ends_with` | Output ends with value |
+| `min_length` | Minimum character count |
+| `max_length` | Maximum character count |
+| `not_empty` | Output is not empty |
+| `json_valid` | Output is valid JSON |
+| `json_path` | JSONPath query exists or matches |
+| `line_count` | Exact line count |
+| `min_lines` | Minimum line count |
+| `max_lines` | Maximum line count |
+| `word_count` | Exact word count |
+
 ## Secret Scanning
 
 PromptSmith warns you about potential secrets before committing:
@@ -161,8 +219,8 @@ Features:
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
-- [x] **Phase 2**: Diff, tags, web UI (branching in progress)
-- [ ] **Phase 3**: Testing framework
+- [x] **Phase 2**: Diff, tags, web UI
+- [x] **Phase 3**: Testing framework (CLI complete, web UI in progress)
 - [ ] **Phase 4**: Multi-model benchmarking
 - [ ] **Phase 5**: Cloud sync, collaboration
 
