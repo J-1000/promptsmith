@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { DiffViewer } from '../components/DiffViewer'
+import { TestResults, SuiteResult } from '../components/TestResults'
 import styles from './PromptPage.module.css'
 
 // Mock data - will be replaced with CLI/API integration
@@ -59,10 +60,72 @@ const mockDiff = `@@ -10,6 +10,9 @@
 -Be warm and welcoming.
 +Be warm and welcoming. Keep the greeting concise but personable.`
 
+const mockTestResults: SuiteResult = {
+  suiteName: 'greeting-tests',
+  promptName: 'greeting',
+  version: '1.0.2',
+  passed: 3,
+  failed: 1,
+  skipped: 1,
+  total: 5,
+  durationMs: 45,
+  results: [
+    {
+      testName: 'basic-greeting',
+      passed: true,
+      skipped: false,
+      durationMs: 8,
+    },
+    {
+      testName: 'formal-tone',
+      passed: true,
+      skipped: false,
+      durationMs: 12,
+    },
+    {
+      testName: 'casual-tone',
+      passed: true,
+      skipped: false,
+      durationMs: 10,
+    },
+    {
+      testName: 'max-length-check',
+      passed: false,
+      skipped: false,
+      durationMs: 11,
+      failures: [
+        {
+          type: 'max_length',
+          message: 'expected at most 50 characters, got 78',
+          expected: '50',
+          actual: '78',
+        },
+      ],
+    },
+    {
+      testName: 'edge-case-empty-name',
+      passed: false,
+      skipped: true,
+      durationMs: 0,
+    },
+  ],
+}
+
 export function PromptPage() {
   const { name } = useParams<{ name: string }>()
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
-  const [view, setView] = useState<'content' | 'history' | 'diff'>('content')
+  const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests'>('content')
+  const [testResults, setTestResults] = useState<SuiteResult | null>(mockTestResults)
+  const [isRunningTests, setIsRunningTests] = useState(false)
+
+  const handleRunTests = () => {
+    setIsRunningTests(true)
+    // Simulate running tests
+    setTimeout(() => {
+      setTestResults(mockTestResults)
+      setIsRunningTests(false)
+    }, 1000)
+  }
 
   const toggleVersion = (version: string) => {
     setSelectedVersions((prev) => {
@@ -108,6 +171,16 @@ export function PromptPage() {
             disabled={selectedVersions.length < 2}
           >
             Diff {selectedVersions.length === 2 && `(${selectedVersions[0]} vs ${selectedVersions[1]})`}
+          </button>
+          <button
+            className={`${styles.tab} ${view === 'tests' ? styles.tabActive : ''}`}
+            onClick={() => setView('tests')}
+          >
+            Tests {testResults && (
+              <span className={testResults.failed > 0 ? styles.testsFailed : styles.testsPassed}>
+                {testResults.passed}/{testResults.total}
+              </span>
+            )}
           </button>
         </div>
       </div>
@@ -158,6 +231,14 @@ export function PromptPage() {
             oldVersion={selectedVersions[0]}
             newVersion={selectedVersions[1]}
             diff={mockDiff}
+          />
+        )}
+
+        {view === 'tests' && (
+          <TestResults
+            results={testResults}
+            onRunTests={handleRunTests}
+            isRunning={isRunningTests}
           />
         )}
       </div>
