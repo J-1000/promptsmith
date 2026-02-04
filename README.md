@@ -11,6 +11,7 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Secret Scanning** — Detects API keys and credentials before commit
 - **Testing** — Define test suites with 15+ assertion types
 - **Benchmarking** — Compare prompts across OpenAI and Anthropic models
+- **AI Generation** — Generate variations, compress, or expand prompts with LLMs
 
 ## Installation
 
@@ -74,6 +75,7 @@ promptsmith log
 | `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
 | `promptsmith test [files...]` | Run test suites |
 | `promptsmith benchmark [files...]` | Run model benchmarks |
+| `promptsmith generate <prompt>` | Generate prompt variations with AI |
 
 Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
@@ -217,6 +219,28 @@ Benchmark output shows latency percentiles (p50, p99), token usage, cost per req
 Set API keys via environment variables:
 - `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
+
+## Prompt Generation
+
+Generate prompt variations using AI:
+
+```bash
+promptsmith generate summarizer                    # Generate 3 variations
+promptsmith generate summarizer --count 5          # Generate 5 variations
+promptsmith generate summarizer --type compress    # Compress the prompt
+promptsmith generate summarizer --type expand      # Expand with more detail
+promptsmith generate summarizer --goal "be concise"
+promptsmith generate summarizer --model claude-sonnet
+```
+
+### Generation Types
+
+| Type | Description |
+|------|-------------|
+| `variations` | Create alternative versions with different approaches |
+| `compress` | Reduce token count while preserving functionality |
+| `expand` | Add more detail, examples, and edge case handling |
+| `rephrase` | Reword while keeping the same meaning |
 
 ## Secret Scanning
 
