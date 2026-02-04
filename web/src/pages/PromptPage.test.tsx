@@ -68,4 +68,51 @@ describe('PromptPage', () => {
     const diffTab = screen.getByRole('button', { name: /diff/i })
     expect(diffTab).not.toBeDisabled()
   })
+
+  it('renders tests tab with results count', () => {
+    renderWithRouter('/prompt/greeting')
+    // Tests tab should show pass/total count
+    expect(screen.getByRole('button', { name: /tests/i })).toBeInTheDocument()
+    expect(screen.getByText('3/5')).toBeInTheDocument()
+  })
+
+  it('switches to tests view when tab clicked', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await user.click(screen.getByRole('button', { name: /tests/i }))
+
+    // Should show test results
+    expect(screen.getByText('3 passed')).toBeInTheDocument()
+    expect(screen.getByText('1 failed')).toBeInTheDocument()
+  })
+
+  it('renders benchmarks tab with model count', () => {
+    renderWithRouter('/prompt/greeting')
+    expect(screen.getByRole('button', { name: /benchmarks/i })).toBeInTheDocument()
+    // Should show model count badge
+    expect(screen.getByText('3')).toBeInTheDocument()
+  })
+
+  it('switches to benchmarks view when tab clicked', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await user.click(screen.getByRole('button', { name: /benchmarks/i }))
+
+    // Should show benchmark results
+    expect(screen.getByText('gpt-4o')).toBeInTheDocument()
+    expect(screen.getByText('gpt-4o-mini')).toBeInTheDocument()
+    expect(screen.getByText('claude-sonnet')).toBeInTheDocument()
+  })
+
+  it('shows recommendation in benchmarks view', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await user.click(screen.getByRole('button', { name: /benchmarks/i }))
+
+    // gpt-4o-mini should be recommended (fastest and cheapest in mock data)
+    expect(screen.getByText('gpt-4o-mini (best latency & cost)')).toBeInTheDocument()
+  })
 })
