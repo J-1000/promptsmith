@@ -280,13 +280,14 @@ Features:
 - Unified diff viewer for comparing versions
 - Test results dashboard with pass/fail indicators
 - Benchmark results with model comparison table
+- AI-powered prompt variation generator
 
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
 - [x] **Phase 2**: Diff, tags, web UI scaffolding
 - [x] **Phase 3**: Testing framework with 15+ assertion types
-- [x] **Phase 4**: Multi-model benchmarking (OpenAI, Anthropic)
+- [x] **Phase 4**: Multi-model benchmarking, AI generation, live testing
 - [ ] **Phase 5**: Cloud sync, collaboration
 
 ## License
