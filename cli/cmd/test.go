@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/promptsmith/cli/internal/benchmark"
 	"github.com/promptsmith/cli/internal/db"
 	"github.com/promptsmith/cli/internal/testing"
 	"github.com/spf13/cobra"
@@ -17,6 +18,8 @@ var (
 	testFilter  string
 	testVersion string
 	testOutput  string
+	testLive    bool
+	testModel   string
 )
 
 var testCmd = &cobra.Command{
@@ -27,11 +30,16 @@ var testCmd = &cobra.Command{
 Test suites are YAML files that define test cases with inputs and assertions.
 If no files are specified, runs all .test.yaml files in the tests/ directory.
 
+By default, tests run with mock outputs (the rendered prompt).
+Use --live to run tests against real LLMs (requires API keys).
+
 Examples:
   promptsmith test                           # Run all tests in tests/
   promptsmith test tests/summarizer.test.yaml
   promptsmith test --filter "basic"          # Run tests matching filter
-  promptsmith test --version 1.0.0           # Test specific prompt version`,
+  promptsmith test --version 1.0.0           # Test specific prompt version
+  promptsmith test --live                    # Run with real LLM
+  promptsmith test --live --model gpt-4o     # Use specific model`,
 	RunE: runTest,
 }
 
@@ -39,6 +47,8 @@ func init() {
 	testCmd.Flags().StringVarP(&testFilter, "filter", "f", "", "only run tests matching this pattern")
 	testCmd.Flags().StringVarP(&testVersion, "version", "v", "", "test against specific prompt version")
 	testCmd.Flags().StringVarP(&testOutput, "output", "o", "", "write results to file (JSON format)")
+	testCmd.Flags().BoolVar(&testLive, "live", false, "run tests against real LLMs (requires API keys)")
+	testCmd.Flags().StringVarP(&testModel, "model", "m", "gpt-4o-mini", "model to use for live testing")
 	rootCmd.AddCommand(testCmd)
 }
 
@@ -76,8 +86,34 @@ func runTest(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	// Set up executor
+	var executor testing.OutputExecutor
+	if testLive {
+		// Use real LLM executor
+		registry := benchmark.NewProviderRegistry()
+
+		// Register OpenAI if API key available
+		if os.Getenv("OPENAI_API_KEY") != "" {
+			if p, err := benchmark.NewOpenAIProvider(); err == nil {
+				registry.Register(p)
+			}
+		}
+
+		// Register Anthropic if API key available
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			if p, err := benchmark.NewAnthropicProvider(); err == nil {
+				registry.Register(p)
+			}
+		}
+
+		executor = testing.NewLLMExecutor(registry, testing.WithModel(testModel))
+		if !jsonOut {
+			fmt.Printf("Running tests with live LLM (%s)\n", testModel)
+		}
+	}
+
 	// Parse and run all suites
-	runner := testing.NewRunner(database, nil)
+	runner := testing.NewRunner(database, executor)
 	var allResults []*testing.SuiteResult
 	totalPassed, totalFailed, totalSkipped := 0, 0, 0
 
