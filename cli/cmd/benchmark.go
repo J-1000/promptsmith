@@ -80,9 +80,16 @@ func runBenchmark(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Create runner with no registered providers (dry run mode)
-	// Actual LLM providers will be registered when API keys are configured
-	runner := benchmark.NewRunner(database, nil)
+	// Create provider registry and register available providers
+	registry := benchmark.NewProviderRegistry()
+	if openai, err := benchmark.NewOpenAIProvider(); err == nil {
+		registry.Register(openai)
+	}
+	if anthropic, err := benchmark.NewAnthropicProvider(); err == nil {
+		registry.Register(anthropic)
+	}
+
+	runner := benchmark.NewRunner(database, registry)
 	var allResults []*benchmark.BenchmarkResult
 
 	cyan := color.New(color.FgCyan).SprintFunc()
