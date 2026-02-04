@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { DiffViewer } from '../components/DiffViewer'
 import { TestResults, SuiteResult } from '../components/TestResults'
+import { BenchmarkResults, BenchmarkResult } from '../components/BenchmarkResults'
 import styles from './PromptPage.module.css'
 
 // Mock data - will be replaced with CLI/API integration
@@ -111,12 +112,67 @@ const mockTestResults: SuiteResult = {
   ],
 }
 
+const mockBenchmarkResults: BenchmarkResult = {
+  suiteName: 'greeting-benchmark',
+  promptName: 'greeting',
+  version: '1.0.2',
+  models: [
+    {
+      model: 'gpt-4o',
+      runs: 5,
+      latencyP50Ms: 1850,
+      latencyP99Ms: 2400,
+      latencyAvgMs: 1920,
+      totalTokensAvg: 156,
+      promptTokens: 85,
+      outputTokensAvg: 71,
+      costPerRequest: 0.0012,
+      totalCost: 0.006,
+      errors: 0,
+      errorRate: 0,
+    },
+    {
+      model: 'gpt-4o-mini',
+      runs: 5,
+      latencyP50Ms: 650,
+      latencyP99Ms: 980,
+      latencyAvgMs: 720,
+      totalTokensAvg: 148,
+      promptTokens: 85,
+      outputTokensAvg: 63,
+      costPerRequest: 0.00012,
+      totalCost: 0.0006,
+      errors: 0,
+      errorRate: 0,
+    },
+    {
+      model: 'claude-sonnet',
+      runs: 5,
+      latencyP50Ms: 1200,
+      latencyP99Ms: 1650,
+      latencyAvgMs: 1280,
+      totalTokensAvg: 162,
+      promptTokens: 85,
+      outputTokensAvg: 77,
+      costPerRequest: 0.0018,
+      totalCost: 0.009,
+      errors: 0,
+      errorRate: 0,
+    },
+  ],
+  durationMs: 28500,
+  startedAt: '2025-02-04T10:00:00Z',
+  completedAt: '2025-02-04T10:00:28Z',
+}
+
 export function PromptPage() {
   const { name } = useParams<{ name: string }>()
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
-  const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests'>('content')
+  const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests' | 'benchmarks'>('content')
   const [testResults, setTestResults] = useState<SuiteResult | null>(mockTestResults)
   const [isRunningTests, setIsRunningTests] = useState(false)
+  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult | null>(mockBenchmarkResults)
+  const [isRunningBenchmark, setIsRunningBenchmark] = useState(false)
 
   const handleRunTests = () => {
     setIsRunningTests(true)
@@ -125,6 +181,15 @@ export function PromptPage() {
       setTestResults(mockTestResults)
       setIsRunningTests(false)
     }, 1000)
+  }
+
+  const handleRunBenchmark = () => {
+    setIsRunningBenchmark(true)
+    // Simulate running benchmark
+    setTimeout(() => {
+      setBenchmarkResults(mockBenchmarkResults)
+      setIsRunningBenchmark(false)
+    }, 2000)
   }
 
   const toggleVersion = (version: string) => {
@@ -179,6 +244,16 @@ export function PromptPage() {
             Tests {testResults && (
               <span className={testResults.failed > 0 ? styles.testsFailed : styles.testsPassed}>
                 {testResults.passed}/{testResults.total}
+              </span>
+            )}
+          </button>
+          <button
+            className={`${styles.tab} ${view === 'benchmarks' ? styles.tabActive : ''}`}
+            onClick={() => setView('benchmarks')}
+          >
+            Benchmarks {benchmarkResults && (
+              <span className={styles.benchmarkCount}>
+                {benchmarkResults.models.length}
               </span>
             )}
           </button>
@@ -239,6 +314,14 @@ export function PromptPage() {
             results={testResults}
             onRunTests={handleRunTests}
             isRunning={isRunningTests}
+          />
+        )}
+
+        {view === 'benchmarks' && (
+          <BenchmarkResults
+            results={benchmarkResults}
+            onRunBenchmark={handleRunBenchmark}
+            isRunning={isRunningBenchmark}
           />
         )}
       </div>
