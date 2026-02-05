@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -1511,4 +1512,125 @@ func TestCommitCommandMultiplePrompts(t *testing.T) {
 			t.Errorf("expected 1 version for %s, got %d", name, len(versions))
 		}
 	}
+}
+
+// ============================================================================
+// Log Command Integration Tests
+// ============================================================================
+
+func TestLogCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "logtest", "Content v1")
+	commitMessage = "First version"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Run log command - should not error
+	logPrompt = ""
+	logLimit = 10
+	err := runLog(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runLog failed: %v", err)
+	}
+}
+
+func TestLogCommandSpecificPrompt(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit multiple versions
+	promptPath := filepath.Join(tmpDir, "prompts", "multilog.prompt")
+	if err := os.WriteFile(promptPath, []byte("V1"), 0644); err != nil {
+		t.Fatalf("failed to write prompt: %v", err)
+	}
+	runAdd(&cobra.Command{}, []string{"prompts/multilog.prompt"})
+
+	commitMessage = "Version 1"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V2"), 0644)
+	commitMessage = "Version 2"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V3"), 0644)
+	commitMessage = "Version 3"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Run log for specific prompt
+	logPrompt = "multilog"
+	logLimit = 10
+	err := runLog(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runLog failed: %v", err)
+	}
+
+	// Verify 3 versions exist
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("multilog")
+	versions, _ := database.ListVersions(prompt.ID)
+	if len(versions) != 3 {
+		t.Errorf("expected 3 versions, got %d", len(versions))
+	}
+}
+
+func TestLogCommandPromptNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to log non-existent prompt
+	logPrompt = "nonexistent"
+	logLimit = 10
+	err := runLog(&cobra.Command{}, []string{})
+	if err == nil {
+		t.Error("expected error for non-existent prompt")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestLogCommandNoCommits(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Run log with no commits
+	logPrompt = ""
+	logLimit = 10
+	err := runLog(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runLog failed: %v", err)
+	}
+	// Should print "No commits yet." but not error
+}
+
+func TestLogCommandLimit(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create multiple versions
+	promptPath := filepath.Join(tmpDir, "prompts", "limited.prompt")
+	os.WriteFile(promptPath, []byte("V1"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/limited.prompt"})
+
+	for i := 1; i <= 5; i++ {
+		os.WriteFile(promptPath, []byte(fmt.Sprintf("V%d", i)), 0644)
+		commitMessage = fmt.Sprintf("Version %d", i)
+		runCommit(&cobra.Command{}, []string{})
+	}
+
+	// Test with limit
+	logPrompt = "limited"
+	logLimit = 2
+	err := runLog(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runLog failed: %v", err)
+	}
+	// The log should only show 2 entries (limit applies to display, not verification)
 }
