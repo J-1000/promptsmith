@@ -574,3 +574,88 @@ func TestLoadAndSaveConfig(t *testing.T) {
 		t.Errorf("reloaded temperature = %f, want %f", reloaded.Defaults.Temperature, 0.9)
 	}
 }
+
+// ============================================================================
+// Status Command Tests
+// ============================================================================
+
+func TestHashContent(t *testing.T) {
+	tests := []struct {
+		content1 string
+		content2 string
+		sameHash bool
+	}{
+		{"hello", "hello", true},
+		{"hello", "world", false},
+		{"", "", true},
+		{"test\nwith\nnewlines", "test\nwith\nnewlines", true},
+		{"test\nwith\nnewlines", "test\nwith\ndifferent", false},
+	}
+
+	for i, tt := range tests {
+		hash1 := hashContent(tt.content1)
+		hash2 := hashContent(tt.content2)
+
+		if tt.sameHash && hash1 != hash2 {
+			t.Errorf("test %d: expected same hash for %q and %q", i, tt.content1, tt.content2)
+		}
+		if !tt.sameHash && hash1 == hash2 {
+			t.Errorf("test %d: expected different hash for %q and %q", i, tt.content1, tt.content2)
+		}
+	}
+
+	// Verify hash is 64 chars (SHA256 hex)
+	hash := hashContent("test")
+	if len(hash) != 64 {
+		t.Errorf("hash length = %d, want 64", len(hash))
+	}
+}
+
+func TestStatusDetection(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+
+	prompt, _ := database.GetPromptByName("summarizer")
+
+	// Read the original content
+	promptPath := filepath.Join(tmpDir, "prompts", "summarizer.prompt")
+	originalContent, _ := os.ReadFile(promptPath)
+
+	// Create a version with the original content
+	_, err = database.CreateVersion(prompt.ID, "1.0.0", string(originalContent), "[]", "{}", "Initial", "user", nil)
+	if err != nil {
+		t.Fatalf("failed to create version: %v", err)
+	}
+
+	database.Close()
+
+	// Test 1: File unchanged - should be clean
+	database, _ = db.Open(tmpDir)
+	latestVersion, _ := database.GetLatestVersion(prompt.ID)
+	currentContent, _ := os.ReadFile(promptPath)
+
+	currentHash := hashContent(string(currentContent))
+	storedHash := hashContent(latestVersion.Content)
+
+	if currentHash != storedHash {
+		t.Error("unchanged file should have same hash")
+	}
+
+	// Test 2: Modify file - should be modified
+	modifiedContent := string(originalContent) + "\n# Modified"
+	os.WriteFile(promptPath, []byte(modifiedContent), 0644)
+
+	newContent, _ := os.ReadFile(promptPath)
+	newHash := hashContent(string(newContent))
+
+	if newHash == storedHash {
+		t.Error("modified file should have different hash")
+	}
+
+	database.Close()
+}
