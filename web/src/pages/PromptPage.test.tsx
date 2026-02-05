@@ -91,7 +91,9 @@ describe('PromptPage', () => {
   it('shows current version', async () => {
     renderWithRouter('/prompt/greeting')
     await waitFor(() => {
-      expect(screen.getByText('v1.0.2')).toBeInTheDocument()
+      // Version appears in header badge
+      const versionElements = screen.getAllByText('v1.0.2')
+      expect(versionElements.length).toBeGreaterThan(0)
     })
   })
 
