@@ -67,6 +67,7 @@ promptsmith log
 | `promptsmith init [name]` | Initialize a new project |
 | `promptsmith add <file>` | Track a prompt file |
 | `promptsmith commit -m "msg"` | Create new version for changed prompts |
+| `promptsmith status` | Show project status and uncommitted changes |
 | `promptsmith log` | Show version history |
 | `promptsmith log -p <name>` | Show history for specific prompt |
 | `promptsmith diff <prompt> [v1] [v2]` | Compare versions (unified diff) |
@@ -74,8 +75,11 @@ promptsmith log
 | `promptsmith tag <prompt> --list` | List all tags |
 | `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
 | `promptsmith test [files...]` | Run test suites |
+| `promptsmith test --watch` | Watch mode - re-run tests on file changes |
 | `promptsmith benchmark [files...]` | Run model benchmarks |
 | `promptsmith generate <prompt>` | Generate prompt variations with AI |
+| `promptsmith config` | View/modify project configuration |
+| `promptsmith serve` | Start API server for web UI integration |
 
 Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
