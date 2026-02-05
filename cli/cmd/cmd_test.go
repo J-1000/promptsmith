@@ -659,3 +659,45 @@ func TestStatusDetection(t *testing.T) {
 
 	database.Close()
 }
+
+// ============================================================================
+// List Command Tests
+// ============================================================================
+
+func TestListPrompts(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+
+	// Get the prompt we created in setup
+	prompts, err := database.ListPrompts()
+	if err != nil {
+		t.Fatalf("ListPrompts failed: %v", err)
+	}
+
+	if len(prompts) != 1 {
+		t.Errorf("expected 1 prompt, got %d", len(prompts))
+	}
+
+	if prompts[0].Name != "summarizer" {
+		t.Errorf("prompt name = %q, want %q", prompts[0].Name, "summarizer")
+	}
+
+	// Add another prompt
+	project, _ := database.GetProject()
+	_, err = database.CreatePrompt(project.ID, "translator", "Translates text", "prompts/translator.prompt")
+	if err != nil {
+		t.Fatalf("CreatePrompt failed: %v", err)
+	}
+
+	prompts, _ = database.ListPrompts()
+	if len(prompts) != 2 {
+		t.Errorf("expected 2 prompts, got %d", len(prompts))
+	}
+
+	database.Close()
+}
