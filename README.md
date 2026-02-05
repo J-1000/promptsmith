@@ -66,6 +66,7 @@ promptsmith log
 |---------|-------------|
 | `promptsmith init [name]` | Initialize a new project |
 | `promptsmith add <file>` | Track a prompt file |
+| `promptsmith remove <prompt>` | Stop tracking a prompt |
 | `promptsmith commit -m "msg"` | Create new version for changed prompts |
 | `promptsmith status` | Show project status and uncommitted changes |
 | `promptsmith list` | List all tracked prompts with versions |
