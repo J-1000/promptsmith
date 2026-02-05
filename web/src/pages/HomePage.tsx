@@ -1,66 +1,73 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { listPrompts, Prompt } from '../api'
 import styles from './HomePage.module.css'
 
-// Mock data - will be replaced with CLI/API integration
-const mockPrompts = [
-  {
-    name: 'greeting',
-    description: 'A friendly greeting prompt',
-    version: '1.0.2',
-    lastModified: '2024-01-15',
-    tags: ['prod'],
-  },
-  {
-    name: 'summarize',
-    description: 'Summarizes long text into key points',
-    version: '2.1.0',
-    lastModified: '2024-01-14',
-    tags: ['staging', 'prod'],
-  },
-  {
-    name: 'code-review',
-    description: 'Reviews code and suggests improvements',
-    version: '1.0.0',
-    lastModified: '2024-01-10',
-    tags: [],
-  },
-]
-
 export function HomePage() {
+  const [prompts, setPrompts] = useState<Prompt[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    listPrompts()
+      .then(setPrompts)
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.loading}>Loading prompts...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.error}>
+          <p>Failed to load prompts: {error}</p>
+          <p className={styles.hint}>Make sure the server is running: <code>promptsmith serve</code></p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>Prompts</h1>
         <p className={styles.subtitle}>
-          {mockPrompts.length} prompts tracked
+          {prompts.length} prompts tracked
         </p>
       </div>
 
-      <div className={styles.grid}>
-        {mockPrompts.map((prompt) => (
-          <Link
-            key={prompt.name}
-            to={`/prompt/${prompt.name}`}
-            className={styles.card}
-          >
-            <div className={styles.cardHeader}>
-              <span className={styles.promptName}>{prompt.name}</span>
-              <span className={styles.version}>v{prompt.version}</span>
-            </div>
-            <p className={styles.description}>{prompt.description}</p>
-            <div className={styles.cardFooter}>
-              <span className={styles.date}>{prompt.lastModified}</span>
-              {prompt.tags.length > 0 && (
-                <div className={styles.tags}>
-                  {prompt.tags.map((tag) => (
-                    <span key={tag} className={styles.tag}>{tag}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </Link>
-        ))}
-      </div>
+      {prompts.length === 0 ? (
+        <div className={styles.empty}>
+          <p>No prompts tracked yet.</p>
+          <p className={styles.hint}>Add a prompt with: <code>promptsmith add &lt;file&gt;</code></p>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {prompts.map((prompt) => (
+            <Link
+              key={prompt.name}
+              to={`/prompt/${prompt.name}`}
+              className={styles.card}
+            >
+              <div className={styles.cardHeader}>
+                <span className={styles.promptName}>{prompt.name}</span>
+                {prompt.version && <span className={styles.version}>v{prompt.version}</span>}
+              </div>
+              <p className={styles.description}>{prompt.description || 'No description'}</p>
+              <div className={styles.cardFooter}>
+                <span className={styles.date}>{new Date(prompt.created_at).toLocaleDateString()}</span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
