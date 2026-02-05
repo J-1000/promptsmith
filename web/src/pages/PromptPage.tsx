@@ -30,6 +30,7 @@ export function PromptPage() {
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [versions, setVersions] = useState<VersionDisplay[]>([])
   const [currentContent, setCurrentContent] = useState<string>('')
+  const [viewingVersion, setViewingVersion] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
@@ -54,6 +55,14 @@ export function PromptPage() {
     }
   }
 
+  const handleVersionChange = (version: string) => {
+    const versionData = versions.find((v) => v.version === version)
+    if (versionData) {
+      setViewingVersion(version)
+      setCurrentContent(versionData.content)
+    }
+  }
+
   useEffect(() => {
     if (!name) return
 
@@ -70,6 +79,7 @@ export function PromptPage() {
         setVersions(versionDisplays)
         if (versionDisplays.length > 0) {
           setCurrentContent(versionDisplays[0].content)
+          setViewingVersion(versionDisplays[0].version)
         }
       })
       .catch((err) => setError(err.message))
@@ -290,7 +300,22 @@ export function PromptPage() {
         {view === 'content' && (
           <div className={styles.codeBlock}>
             <div className={styles.codeHeader}>
-              <span className={styles.fileName}>{prompt?.file_path || `${name}.prompt`}</span>
+              <div className={styles.codeHeaderLeft}>
+                <span className={styles.fileName}>{prompt?.file_path || `${name}.prompt`}</span>
+                {versions.length > 1 && (
+                  <select
+                    className={styles.versionSelect}
+                    value={viewingVersion}
+                    onChange={(e) => handleVersionChange(e.target.value)}
+                  >
+                    {versions.map((v) => (
+                      <option key={v.version} value={v.version}>
+                        v{v.version}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <button className={styles.copyButton} onClick={copyToClipboard}>
                 {copied ? 'Copied!' : 'Copy'}
               </button>

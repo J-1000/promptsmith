@@ -128,6 +128,32 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.codeHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.versionSelect {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.versionSelect:hover {
+  border-color: var(--accent-primary);
+}
+
+.versionSelect:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
 .copyButton {
   font-family: var(--font-mono);
   font-size: 12px;
