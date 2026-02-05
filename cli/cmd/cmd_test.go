@@ -826,3 +826,167 @@ func TestRemovePrompt(t *testing.T) {
 
 	database.Close()
 }
+
+// ============================================================================
+// Config Command Edge Case Tests
+// ============================================================================
+
+func TestLoadConfigMissingFile(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "promptsmith-config-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create .promptsmith directory but no config file
+	configDir := filepath.Join(tmpDir, db.ConfigDir)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	_, err = loadConfig(tmpDir)
+	if err == nil {
+		t.Error("expected error when loading missing config")
+	}
+}
+
+func TestLoadConfigInvalidYAML(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "promptsmith-config-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create .promptsmith directory with invalid YAML
+	configDir := filepath.Join(tmpDir, db.ConfigDir)
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("failed to create config dir: %v", err)
+	}
+
+	configPath := filepath.Join(configDir, db.ConfigFile)
+	invalidYAML := `{invalid yaml content: [}`
+	if err := os.WriteFile(configPath, []byte(invalidYAML), 0644); err != nil {
+		t.Fatalf("failed to write invalid config: %v", err)
+	}
+
+	_, err = loadConfig(tmpDir)
+	if err == nil {
+		t.Error("expected error when loading invalid YAML config")
+	}
+}
+
+func TestConfigValueEdgeCases(t *testing.T) {
+	config := &Config{
+		Version: 1,
+		Project: ProjectConfig{
+			Name: "",
+			ID:   "",
+		},
+		PromptsDir:    "",
+		TestsDir:      "",
+		BenchmarksDir: "",
+		Defaults: DefaultsConfig{
+			Model:       "",
+			Temperature: 0,
+		},
+	}
+
+	// Test getting empty values
+	name, err := getConfigValue(config, "project.name")
+	if err != nil {
+		t.Errorf("unexpected error getting empty project.name: %v", err)
+	}
+	if name != "" {
+		t.Errorf("expected empty string, got %q", name)
+	}
+
+	// Test setting empty string values
+	err = setConfigValue(config, "defaults.model", "")
+	if err != nil {
+		t.Errorf("unexpected error setting empty model: %v", err)
+	}
+	if config.Defaults.Model != "" {
+		t.Errorf("expected empty model, got %q", config.Defaults.Model)
+	}
+
+	// Test temperature boundary values
+	err = setConfigValue(config, "defaults.temperature", "0")
+	if err != nil {
+		t.Errorf("unexpected error setting temperature=0: %v", err)
+	}
+	if config.Defaults.Temperature != 0 {
+		t.Errorf("expected temperature 0, got %f", config.Defaults.Temperature)
+	}
+
+	err = setConfigValue(config, "defaults.temperature", "2")
+	if err != nil {
+		t.Errorf("unexpected error setting temperature=2: %v", err)
+	}
+	if config.Defaults.Temperature != 2 {
+		t.Errorf("expected temperature 2, got %f", config.Defaults.Temperature)
+	}
+
+	// Test negative temperature (should fail)
+	err = setConfigValue(config, "defaults.temperature", "-0.1")
+	if err == nil {
+		t.Error("expected error for negative temperature")
+	}
+
+	// Test temperature > 2 (should fail)
+	err = setConfigValue(config, "defaults.temperature", "2.1")
+	if err == nil {
+		t.Error("expected error for temperature > 2")
+	}
+}
+
+func TestConfigPathWithSpaces(t *testing.T) {
+	config := &Config{
+		Version:       1,
+		PromptsDir:    "./my prompts",
+		TestsDir:      "./my tests",
+		BenchmarksDir: "./my benchmarks",
+	}
+
+	// Test getting paths with spaces
+	promptsDir, err := getConfigValue(config, "prompts_dir")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if promptsDir != "./my prompts" {
+		t.Errorf("expected './my prompts', got %q", promptsDir)
+	}
+
+	// Test setting paths with spaces
+	err = setConfigValue(config, "prompts_dir", "./path with/many spaces/here")
+	if err != nil {
+		t.Errorf("unexpected error setting path with spaces: %v", err)
+	}
+	if config.PromptsDir != "./path with/many spaces/here" {
+		t.Errorf("expected path with spaces, got %q", config.PromptsDir)
+	}
+}
+
+func TestConfigDeeplyNestedKey(t *testing.T) {
+	config := &Config{
+		Project: ProjectConfig{Name: "test"},
+		Defaults: DefaultsConfig{Model: "gpt-4o"},
+	}
+
+	// Note: The current implementation ignores extra parts after the second level.
+	// This is acceptable behavior - it just uses the first two parts.
+
+	// Test keys with more than 2 parts - implementation extracts first two parts
+	val, err := getConfigValue(config, "project.name.extra.parts")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if val != "test" {
+		t.Errorf("expected 'test', got %q", val)
+	}
+
+	// Test invalid top-level keys
+	_, err = getConfigValue(config, "completely.unknown.path")
+	if err == nil {
+		t.Error("expected error for unknown top-level key")
+	}
+}
