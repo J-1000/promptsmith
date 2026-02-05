@@ -24,12 +24,13 @@ func init() {
 }
 
 type Config struct {
-	Version     int            `yaml:"version"`
-	Project     ProjectConfig  `yaml:"project"`
-	PromptsDir  string         `yaml:"prompts_dir"`
-	TestsDir    string         `yaml:"tests_dir"`
-	BenchmarksDir string       `yaml:"benchmarks_dir"`
-	Defaults    DefaultsConfig `yaml:"defaults"`
+	Version       int            `yaml:"version"`
+	Project       ProjectConfig  `yaml:"project"`
+	PromptsDir    string         `yaml:"prompts_dir"`
+	TestsDir      string         `yaml:"tests_dir"`
+	BenchmarksDir string         `yaml:"benchmarks_dir"`
+	Defaults      DefaultsConfig `yaml:"defaults"`
+	Sync          SyncConfig     `yaml:"sync,omitempty"`
 }
 
 type ProjectConfig struct {
@@ -40,6 +41,12 @@ type ProjectConfig struct {
 type DefaultsConfig struct {
 	Model       string  `yaml:"model"`
 	Temperature float64 `yaml:"temperature"`
+}
+
+type SyncConfig struct {
+	Remote   string `yaml:"remote,omitempty"`
+	AutoPush bool   `yaml:"auto_push,omitempty"`
+	Team     string `yaml:"team,omitempty"`
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
