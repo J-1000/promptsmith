@@ -292,9 +292,11 @@ npm run dev        # Runs on http://localhost:8081
 ```
 
 Features:
-- Prompt list with version badges and tags
-- Version history with commit messages
+- Prompt list with version badges and search/filter
+- Version history with commit messages and tags
+- Version selector to view older prompt versions
 - Unified diff viewer for comparing versions
+- Copy to clipboard for prompt content
 - Test results dashboard with pass/fail indicators
 - Benchmark results with model comparison table
 - AI-powered prompt variation generator
