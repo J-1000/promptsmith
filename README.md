@@ -86,6 +86,7 @@ promptsmith log
 | `promptsmith serve` | Start API server for web UI integration |
 | `promptsmith login` | Authenticate with PromptSmith cloud |
 | `promptsmith logout` | Log out from PromptSmith cloud |
+| `promptsmith whoami` | Show current user info |
 | `promptsmith push` | Sync local changes to cloud |
 | `promptsmith pull` | Fetch latest from cloud |
 
