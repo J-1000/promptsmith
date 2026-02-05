@@ -1314,3 +1314,201 @@ World!
 		t.Errorf("expected 'already exists' error, got: %v", err)
 	}
 }
+
+// ============================================================================
+// Commit Command Integration Tests
+// ============================================================================
+
+// addTestPrompt is a helper to add a prompt to a project
+func addTestPrompt(t *testing.T, tmpDir, name, content string) {
+	t.Helper()
+	promptPath := filepath.Join(tmpDir, "prompts", name+".prompt")
+	if err := os.WriteFile(promptPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+	err := runAdd(&cobra.Command{}, []string{"prompts/" + name + ".prompt"})
+	if err != nil {
+		t.Fatalf("failed to add prompt: %v", err)
+	}
+}
+
+func TestCommitCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add a prompt
+	addTestPrompt(t, tmpDir, "greeting", `---
+name: greeting
+description: A greeting prompt
+---
+Hello {{name}}!
+`)
+
+	// Set commit message
+	commitMessage = "Initial commit"
+
+	// Run commit
+	err := runCommit(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runCommit failed: %v", err)
+	}
+
+	// Verify version was created
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("greeting")
+	versions, err := database.ListVersions(prompt.ID)
+	if err != nil {
+		t.Fatalf("failed to list versions: %v", err)
+	}
+
+	if len(versions) != 1 {
+		t.Fatalf("expected 1 version, got %d", len(versions))
+	}
+
+	if versions[0].Version != "1.0.0" {
+		t.Errorf("expected version 1.0.0, got %s", versions[0].Version)
+	}
+
+	if versions[0].CommitMessage != "Initial commit" {
+		t.Errorf("expected commit message 'Initial commit', got %s", versions[0].CommitMessage)
+	}
+}
+
+func TestCommitCommandNoChanges(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add a prompt
+	addTestPrompt(t, tmpDir, "nochange", `Hello!`)
+
+	// Commit first time
+	commitMessage = "First commit"
+	err := runCommit(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("first commit failed: %v", err)
+	}
+
+	// Commit again without changes - should succeed but not create new version
+	commitMessage = "Second commit"
+	err = runCommit(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("second commit failed: %v", err)
+	}
+
+	// Verify only one version exists
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("nochange")
+	versions, _ := database.ListVersions(prompt.ID)
+
+	if len(versions) != 1 {
+		t.Errorf("expected 1 version (no changes), got %d", len(versions))
+	}
+}
+
+func TestCommitCommandVersionBump(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "versioned.prompt")
+
+	// Add and commit first version
+	if err := os.WriteFile(promptPath, []byte("Version 1"), 0644); err != nil {
+		t.Fatalf("failed to write prompt: %v", err)
+	}
+	runAdd(&cobra.Command{}, []string{"prompts/versioned.prompt"})
+	commitMessage = "Version 1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Modify and commit second version
+	if err := os.WriteFile(promptPath, []byte("Version 2"), 0644); err != nil {
+		t.Fatalf("failed to write prompt: %v", err)
+	}
+	commitMessage = "Version 2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Modify and commit third version
+	if err := os.WriteFile(promptPath, []byte("Version 3"), 0644); err != nil {
+		t.Fatalf("failed to write prompt: %v", err)
+	}
+	commitMessage = "Version 3"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Verify versions
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("versioned")
+	versions, _ := database.ListVersions(prompt.ID)
+
+	if len(versions) != 3 {
+		t.Fatalf("expected 3 versions, got %d", len(versions))
+	}
+
+	// Versions are returned newest first
+	expectedVersions := []string{"1.0.2", "1.0.1", "1.0.0"}
+	for i, v := range versions {
+		if v.Version != expectedVersions[i] {
+			t.Errorf("expected version %s at index %d, got %s", expectedVersions[i], i, v.Version)
+		}
+	}
+}
+
+func TestCommitCommandNoPrompts(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to commit with no prompts tracked
+	commitMessage = "Empty commit"
+	err := runCommit(&cobra.Command{}, []string{})
+	if err == nil {
+		t.Error("expected error when committing with no prompts")
+	}
+	if !strings.Contains(err.Error(), "no prompts tracked") {
+		t.Errorf("expected 'no prompts tracked' error, got: %v", err)
+	}
+}
+
+func TestCommitCommandMultiplePrompts(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add multiple prompts
+	addTestPrompt(t, tmpDir, "prompt1", "Content 1")
+	addTestPrompt(t, tmpDir, "prompt2", "Content 2")
+	addTestPrompt(t, tmpDir, "prompt3", "Content 3")
+
+	// Commit all
+	commitMessage = "Initial commit for all"
+	err := runCommit(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("commit failed: %v", err)
+	}
+
+	// Verify all have versions
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	for _, name := range []string{"prompt1", "prompt2", "prompt3"} {
+		prompt, _ := database.GetPromptByName(name)
+		versions, _ := database.ListVersions(prompt.ID)
+		if len(versions) != 1 {
+			t.Errorf("expected 1 version for %s, got %d", name, len(versions))
+		}
+	}
+}
