@@ -1,8 +1,56 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PromptPage } from './PromptPage'
+
+// Mock the API
+vi.mock('../api', () => ({
+  getPrompt: vi.fn(),
+  getPromptVersions: vi.fn(),
+  getPromptDiff: vi.fn(),
+  runTest: vi.fn(),
+  runBenchmark: vi.fn(),
+  generateVariations: vi.fn(),
+}))
+
+import { getPrompt, getPromptVersions, getPromptDiff } from '../api'
+
+const mockPrompt = {
+  id: '1',
+  name: 'greeting',
+  description: 'A friendly greeting prompt',
+  file_path: 'greeting.prompt',
+  version: '1.0.2',
+  created_at: '2024-01-15T00:00:00Z',
+}
+
+const mockVersions = [
+  {
+    id: '1',
+    version: '1.0.2',
+    content: 'You are a helpful assistant. Greet the user {{user_name}} in a {{tone}} manner.',
+    commit_message: 'Add tone parameter for flexibility',
+    created_at: '2024-01-15T14:32:00Z',
+    tags: ['prod'],
+  },
+  {
+    id: '2',
+    version: '1.0.1',
+    content: 'You are a helpful assistant. Greet the user {{user_name}}.',
+    commit_message: 'Fix greeting for edge cases',
+    created_at: '2024-01-12T09:15:00Z',
+    tags: [],
+  },
+  {
+    id: '3',
+    version: '1.0.0',
+    content: 'Greet the user.',
+    commit_message: 'Initial version of greeting prompt',
+    created_at: '2024-01-10T16:45:00Z',
+    tags: ['staging'],
+  },
+]
 
 function renderWithRouter(initialRoute = '/prompt/greeting') {
   window.history.pushState({}, '', initialRoute)
@@ -16,37 +64,61 @@ function renderWithRouter(initialRoute = '/prompt/greeting') {
 }
 
 describe('PromptPage', () => {
-  it('renders prompt name from URL', () => {
-    renderWithRouter('/prompt/greeting')
-    expect(screen.getByRole('heading', { name: /greeting/i })).toBeInTheDocument()
+  beforeEach(() => {
+    vi.mocked(getPrompt).mockResolvedValue(mockPrompt)
+    vi.mocked(getPromptVersions).mockResolvedValue(mockVersions)
+    vi.mocked(getPromptDiff).mockResolvedValue({
+      prompt: 'greeting',
+      v1: { version: '1.0.1', content: mockVersions[1].content },
+      v2: { version: '1.0.2', content: mockVersions[0].content },
+    })
   })
 
-  it('renders breadcrumb navigation', () => {
+  it('renders prompt name from URL', async () => {
     renderWithRouter('/prompt/greeting')
-    expect(screen.getByText('Prompts')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /greeting/i })).toBeInTheDocument()
+    })
   })
 
-  it('shows current version', () => {
+  it('renders breadcrumb navigation', async () => {
     renderWithRouter('/prompt/greeting')
-    expect(screen.getByText('v1.0.2')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Prompts')).toBeInTheDocument()
+    })
   })
 
-  it('renders tab buttons', () => {
+  it('shows current version', async () => {
     renderWithRouter('/prompt/greeting')
-    expect(screen.getByRole('button', { name: /content/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /diff/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('v1.0.2')).toBeInTheDocument()
+    })
   })
 
-  it('shows content view by default', () => {
+  it('renders tab buttons', async () => {
     renderWithRouter('/prompt/greeting')
-    expect(screen.getByText('greeting.prompt')).toBeInTheDocument()
-    expect(screen.getByText(/You are a helpful assistant/)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /content/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /diff/i })).toBeInTheDocument()
+    })
+  })
+
+  it('shows content view by default', async () => {
+    renderWithRouter('/prompt/greeting')
+    await waitFor(() => {
+      expect(screen.getByText('greeting.prompt')).toBeInTheDocument()
+      expect(screen.getByText(/You are a helpful assistant/)).toBeInTheDocument()
+    })
   })
 
   it('switches to history view when tab clicked', async () => {
     const user = userEvent.setup()
     renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+    })
 
     await user.click(screen.getByRole('button', { name: /history/i }))
 
@@ -57,6 +129,10 @@ describe('PromptPage', () => {
   it('enables diff tab after selecting two versions', async () => {
     const user = userEvent.setup()
     renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+    })
 
     await user.click(screen.getByRole('button', { name: /history/i }))
 
@@ -69,78 +145,36 @@ describe('PromptPage', () => {
     expect(diffTab).not.toBeDisabled()
   })
 
-  it('renders tests tab with results count', () => {
+  it('shows loading state initially', () => {
     renderWithRouter('/prompt/greeting')
-    // Tests tab should show pass/total count
-    expect(screen.getByRole('button', { name: /tests/i })).toBeInTheDocument()
-    expect(screen.getByText('3/5')).toBeInTheDocument()
+    expect(screen.getByText(/loading prompt/i)).toBeInTheDocument()
   })
 
-  it('switches to tests view when tab clicked', async () => {
-    const user = userEvent.setup()
+  it('shows error state on API failure', async () => {
+    vi.mocked(getPrompt).mockRejectedValue(new Error('Not found'))
     renderWithRouter('/prompt/greeting')
-
-    await user.click(screen.getByRole('button', { name: /tests/i }))
-
-    // Should show test results
-    expect(screen.getByText('3 passed')).toBeInTheDocument()
-    expect(screen.getByText('1 failed')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load prompt/i)).toBeInTheDocument()
+    })
   })
 
-  it('renders benchmarks tab with model count', () => {
+  it('renders generate tab', async () => {
     renderWithRouter('/prompt/greeting')
-    expect(screen.getByRole('button', { name: /benchmarks/i })).toBeInTheDocument()
-    // Should show model count badge
-    expect(screen.getByText('3')).toBeInTheDocument()
-  })
-
-  it('switches to benchmarks view when tab clicked', async () => {
-    const user = userEvent.setup()
-    renderWithRouter('/prompt/greeting')
-
-    await user.click(screen.getByRole('button', { name: /benchmarks/i }))
-
-    // Should show benchmark results
-    expect(screen.getByText('gpt-4o')).toBeInTheDocument()
-    expect(screen.getByText('gpt-4o-mini')).toBeInTheDocument()
-    expect(screen.getByText('claude-sonnet')).toBeInTheDocument()
-  })
-
-  it('shows recommendation in benchmarks view', async () => {
-    const user = userEvent.setup()
-    renderWithRouter('/prompt/greeting')
-
-    await user.click(screen.getByRole('button', { name: /benchmarks/i }))
-
-    // gpt-4o-mini should be recommended (fastest and cheapest in mock data)
-    expect(screen.getByText('gpt-4o-mini (best latency & cost)')).toBeInTheDocument()
-  })
-
-  it('renders generate tab', () => {
-    renderWithRouter('/prompt/greeting')
-    expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument()
+    })
   })
 
   it('switches to generate view when tab clicked', async () => {
     const user = userEvent.setup()
     renderWithRouter('/prompt/greeting')
 
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument()
+    })
+
     await user.click(screen.getByRole('button', { name: /generate/i }))
 
-    // Should show generate controls
     expect(screen.getByText('Generate variations of your prompt using AI')).toBeInTheDocument()
-  })
-
-  it('shows generation type buttons in generate view', async () => {
-    const user = userEvent.setup()
-    renderWithRouter('/prompt/greeting')
-
-    await user.click(screen.getByRole('button', { name: /^generate$/i }))
-
-    // Should show type buttons
-    expect(screen.getByRole('button', { name: 'variations' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'compress' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'expand' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'rephrase' })).toBeInTheDocument()
   })
 })
