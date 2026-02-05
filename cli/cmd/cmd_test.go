@@ -348,3 +348,229 @@ func TestResolveVersionForTag(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Config Command Tests
+// ============================================================================
+
+func setupTestProjectWithConfig(t *testing.T) (string, func()) {
+	t.Helper()
+
+	tmpDir, cleanup := setupTestProject(t)
+
+	// Create config file
+	configContent := `version: 1
+project:
+  name: test-project
+  id: test-id-123
+prompts_dir: ./prompts
+tests_dir: ./tests
+benchmarks_dir: ./benchmarks
+defaults:
+  model: gpt-4o
+  temperature: 0.7
+`
+	configPath := filepath.Join(tmpDir, db.ConfigDir, db.ConfigFile)
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		cleanup()
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	return tmpDir, cleanup
+}
+
+func TestGetConfigValue(t *testing.T) {
+	config := &Config{
+		Version: 1,
+		Project: ProjectConfig{
+			Name: "my-project",
+			ID:   "proj-123",
+		},
+		PromptsDir:    "./prompts",
+		TestsDir:      "./tests",
+		BenchmarksDir: "./benchmarks",
+		Defaults: DefaultsConfig{
+			Model:       "gpt-4o",
+			Temperature: 0.7,
+		},
+	}
+
+	tests := []struct {
+		key        string
+		expected   string
+		shouldFail bool
+	}{
+		{"version", "1", false},
+		{"project.name", "my-project", false},
+		{"project.id", "proj-123", false},
+		{"prompts_dir", "./prompts", false},
+		{"tests_dir", "./tests", false},
+		{"benchmarks_dir", "./benchmarks", false},
+		{"defaults.model", "gpt-4o", false},
+		{"defaults.temperature", "0.7", false},
+		{"unknown", "", true},
+		{"project", "", true},  // Missing subkey
+		{"defaults", "", true}, // Missing subkey
+		{"project.unknown", "", true},
+		{"defaults.unknown", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			value, err := getConfigValue(config, tt.key)
+
+			if tt.shouldFail {
+				if err == nil {
+					t.Errorf("expected error for key %q, got value %q", tt.key, value)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error for key %q: %v", tt.key, err)
+					return
+				}
+				if value != tt.expected {
+					t.Errorf("getConfigValue(%q) = %q, want %q", tt.key, value, tt.expected)
+				}
+			}
+		})
+	}
+}
+
+func TestSetConfigValue(t *testing.T) {
+	tests := []struct {
+		key        string
+		value      string
+		shouldFail bool
+		validate   func(*Config) bool
+	}{
+		{
+			key:        "project.name",
+			value:      "new-name",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.Project.Name == "new-name" },
+		},
+		{
+			key:        "prompts_dir",
+			value:      "./new-prompts",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.PromptsDir == "./new-prompts" },
+		},
+		{
+			key:        "tests_dir",
+			value:      "./new-tests",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.TestsDir == "./new-tests" },
+		},
+		{
+			key:        "benchmarks_dir",
+			value:      "./new-benchmarks",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.BenchmarksDir == "./new-benchmarks" },
+		},
+		{
+			key:        "defaults.model",
+			value:      "claude-sonnet",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.Defaults.Model == "claude-sonnet" },
+		},
+		{
+			key:        "defaults.temperature",
+			value:      "0.5",
+			shouldFail: false,
+			validate:   func(c *Config) bool { return c.Defaults.Temperature == 0.5 },
+		},
+		{
+			key:        "defaults.temperature",
+			value:      "invalid",
+			shouldFail: true,
+		},
+		{
+			key:        "defaults.temperature",
+			value:      "3.0", // Out of range
+			shouldFail: true,
+		},
+		{
+			key:        "version",
+			value:      "2",
+			shouldFail: true, // Read-only
+		},
+		{
+			key:        "project.id",
+			value:      "new-id",
+			shouldFail: true, // Cannot set
+		},
+		{
+			key:        "unknown",
+			value:      "value",
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			config := &Config{
+				Version: 1,
+				Project: ProjectConfig{Name: "original", ID: "id"},
+				Defaults: DefaultsConfig{
+					Model:       "gpt-4o",
+					Temperature: 0.7,
+				},
+			}
+
+			err := setConfigValue(config, tt.key, tt.value)
+
+			if tt.shouldFail {
+				if err == nil {
+					t.Errorf("expected error for key %q", tt.key)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+					return
+				}
+				if tt.validate != nil && !tt.validate(config) {
+					t.Errorf("validation failed for key %q", tt.key)
+				}
+			}
+		})
+	}
+}
+
+func TestLoadAndSaveConfig(t *testing.T) {
+	tmpDir, cleanup := setupTestProjectWithConfig(t)
+	defer cleanup()
+
+	// Test load
+	config, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("loadConfig failed: %v", err)
+	}
+
+	if config.Project.Name != "test-project" {
+		t.Errorf("project.name = %q, want %q", config.Project.Name, "test-project")
+	}
+	if config.Defaults.Model != "gpt-4o" {
+		t.Errorf("defaults.model = %q, want %q", config.Defaults.Model, "gpt-4o")
+	}
+
+	// Modify and save
+	config.Project.Name = "modified-project"
+	config.Defaults.Temperature = 0.9
+
+	if err := saveConfig(tmpDir, config); err != nil {
+		t.Fatalf("saveConfig failed: %v", err)
+	}
+
+	// Reload and verify
+	reloaded, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("reload failed: %v", err)
+	}
+
+	if reloaded.Project.Name != "modified-project" {
+		t.Errorf("reloaded project.name = %q, want %q", reloaded.Project.Name, "modified-project")
+	}
+	if reloaded.Defaults.Temperature != 0.9 {
+		t.Errorf("reloaded temperature = %f, want %f", reloaded.Defaults.Temperature, 0.9)
+	}
+}
