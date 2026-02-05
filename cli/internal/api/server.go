@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/promptsmith/cli/internal/db"
+	"github.com/promptsmith/cli/internal/testing"
 )
 
 type Server struct {
@@ -30,6 +33,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/prompts", s.corsMiddleware(s.handlePrompts))
 	s.mux.HandleFunc("/api/prompts/", s.corsMiddleware(s.handlePromptByID))
 	s.mux.HandleFunc("/api/project", s.corsMiddleware(s.handleProject))
+	s.mux.HandleFunc("/api/tests", s.corsMiddleware(s.handleTests))
+	s.mux.HandleFunc("/api/tests/", s.corsMiddleware(s.handleTestByName))
 }
 
 func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -88,6 +93,14 @@ type VersionResponse struct {
 type ProjectResponse struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type TestSuiteResponse struct {
+	Name        string `json:"name"`
+	FilePath    string `json:"file_path"`
+	Prompt      string `json:"prompt"`
+	Description string `json:"description,omitempty"`
+	TestCount   int    `json:"test_count"`
 }
 
 // Handlers
@@ -313,4 +326,133 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request, promptID str
 			"content": version2.Content,
 		},
 	})
+}
+
+// Test handlers
+
+func (s *Server) handleTests(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	testsDir := filepath.Join(s.root, "tests")
+	if _, err := os.Stat(testsDir); os.IsNotExist(err) {
+		writeJSON(w, http.StatusOK, []TestSuiteResponse{})
+		return
+	}
+
+	matches, err := filepath.Glob(filepath.Join(testsDir, "*.test.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := make([]TestSuiteResponse, 0, len(matches))
+	for _, file := range matches {
+		suite, err := testing.ParseSuiteFile(file)
+		if err != nil {
+			continue // Skip invalid files
+		}
+
+		relPath, _ := filepath.Rel(s.root, file)
+		response = append(response, TestSuiteResponse{
+			Name:        suite.Name,
+			FilePath:    relPath,
+			Prompt:      suite.Prompt,
+			Description: suite.Description,
+			TestCount:   len(suite.Tests),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleTestByName(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/tests/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusBadRequest, "test name required")
+		return
+	}
+
+	testName := parts[0]
+
+	// Check for /run endpoint
+	if len(parts) >= 2 && parts[1] == "run" {
+		s.runTest(w, r, testName)
+		return
+	}
+
+	// Get single test suite info
+	s.getTest(w, r, testName)
+}
+
+func (s *Server) getTest(w http.ResponseWriter, r *http.Request, testName string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	testsDir := filepath.Join(s.root, "tests")
+	matches, err := filepath.Glob(filepath.Join(testsDir, "*.test.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	for _, file := range matches {
+		suite, err := testing.ParseSuiteFile(file)
+		if err != nil {
+			continue
+		}
+		if suite.Name == testName {
+			writeJSON(w, http.StatusOK, suite)
+			return
+		}
+	}
+
+	writeError(w, http.StatusNotFound, fmt.Sprintf("test suite '%s' not found", testName))
+}
+
+func (s *Server) runTest(w http.ResponseWriter, r *http.Request, testName string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	testsDir := filepath.Join(s.root, "tests")
+	matches, err := filepath.Glob(filepath.Join(testsDir, "*.test.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var suite *testing.TestSuite
+	for _, file := range matches {
+		s, err := testing.ParseSuiteFile(file)
+		if err != nil {
+			continue
+		}
+		if s.Name == testName {
+			suite = s
+			break
+		}
+	}
+
+	if suite == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("test suite '%s' not found", testName))
+		return
+	}
+
+	// Run the test suite
+	runner := testing.NewRunner(s.db, nil) // Using mock executor
+	result, err := runner.Run(suite)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
