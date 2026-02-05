@@ -7,7 +7,35 @@
 .header {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+.headerTop {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
+}
+
+.searchInput {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  color: var(--text-primary);
+  width: 100%;
+  max-width: 400px;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 .title {

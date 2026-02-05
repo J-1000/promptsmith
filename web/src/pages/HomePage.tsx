@@ -7,6 +7,7 @@ export function HomePage() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     listPrompts()
@@ -14,6 +15,11 @@ export function HomePage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
+
+  const filteredPrompts = prompts.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.description?.toLowerCase().includes(search.toLowerCase())
+  )
 
   if (loading) {
     return (
@@ -37,10 +43,21 @@ export function HomePage() {
   return (
     <div className={styles.container}>
       <div className={styles.header}>
-        <h1 className={styles.title}>Prompts</h1>
-        <p className={styles.subtitle}>
-          {prompts.length} prompts tracked
-        </p>
+        <div className={styles.headerTop}>
+          <h1 className={styles.title}>Prompts</h1>
+          <p className={styles.subtitle}>
+            {prompts.length} prompts tracked
+          </p>
+        </div>
+        {prompts.length > 0 && (
+          <input
+            type="text"
+            className={styles.searchInput}
+            placeholder="Search prompts..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        )}
       </div>
 
       {prompts.length === 0 ? (
@@ -48,9 +65,13 @@ export function HomePage() {
           <p>No prompts tracked yet.</p>
           <p className={styles.hint}>Add a prompt with: <code>promptsmith add &lt;file&gt;</code></p>
         </div>
+      ) : filteredPrompts.length === 0 ? (
+        <div className={styles.empty}>
+          <p>No prompts matching "{search}"</p>
+        </div>
       ) : (
         <div className={styles.grid}>
-          {prompts.map((prompt) => (
+          {filteredPrompts.map((prompt) => (
             <Link
               key={prompt.name}
               to={`/prompt/${prompt.name}`}
