@@ -103,6 +103,20 @@ func getConfigValue(config *Config, key string) (string, error) {
 		default:
 			return "", fmt.Errorf("unknown defaults key: %s", parts[1])
 		}
+	case "sync":
+		if len(parts) < 2 {
+			return "", fmt.Errorf("specify sync.remote, sync.auto_push, or sync.team")
+		}
+		switch parts[1] {
+		case "remote":
+			return config.Sync.Remote, nil
+		case "auto_push":
+			return strconv.FormatBool(config.Sync.AutoPush), nil
+		case "team":
+			return config.Sync.Team, nil
+		default:
+			return "", fmt.Errorf("unknown sync key: %s", parts[1])
+		}
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
 	}
@@ -147,6 +161,24 @@ func setConfigValue(config *Config, key, value string) error {
 		default:
 			return fmt.Errorf("unknown defaults key: %s", parts[1])
 		}
+	case "sync":
+		if len(parts) < 2 {
+			return fmt.Errorf("specify sync.remote, sync.auto_push, or sync.team")
+		}
+		switch parts[1] {
+		case "remote":
+			config.Sync.Remote = value
+		case "auto_push":
+			autoPush, err := strconv.ParseBool(value)
+			if err != nil {
+				return fmt.Errorf("invalid auto_push value (use true/false): %s", value)
+			}
+			config.Sync.AutoPush = autoPush
+		case "team":
+			config.Sync.Team = value
+		default:
+			return fmt.Errorf("unknown sync key: %s", parts[1])
+		}
 	default:
 		return fmt.Errorf("unknown or read-only config key: %s", key)
 	}
@@ -179,6 +211,18 @@ func runConfig(cmd *cobra.Command, args []string) error {
 		fmt.Printf("\n%s\n", cyan("Defaults"))
 		fmt.Printf("  defaults.model:       %s\n", config.Defaults.Model)
 		fmt.Printf("  defaults.temperature: %.1f\n", config.Defaults.Temperature)
+		fmt.Printf("\n%s\n", cyan("Sync"))
+		remoteDisplay := config.Sync.Remote
+		if remoteDisplay == "" {
+			remoteDisplay = dim("(not configured)")
+		}
+		teamDisplay := config.Sync.Team
+		if teamDisplay == "" {
+			teamDisplay = dim("(not set)")
+		}
+		fmt.Printf("  sync.remote:        %s\n", remoteDisplay)
+		fmt.Printf("  sync.auto_push:     %v\n", config.Sync.AutoPush)
+		fmt.Printf("  sync.team:          %s\n", teamDisplay)
 		return nil
 	}
 
