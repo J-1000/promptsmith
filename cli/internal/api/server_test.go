@@ -457,3 +457,268 @@ func TestEmptyTestsAndBenchmarks(t *testing.T) {
 		t.Errorf("expected 0 benchmarks, got %d", len(benchmarks))
 	}
 }
+
+func TestGetTestByName(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create a test file
+	testContent := `name: my-test-suite
+prompt: summarizer
+description: Tests for summarizer
+tests:
+  - name: basic-test
+    inputs:
+      text: "hello"
+    assertions:
+      - type: not_empty
+  - name: advanced-test
+    inputs:
+      text: "world"
+    assertions:
+      - type: contains
+        value: "result"
+`
+	testPath := filepath.Join(tmpDir, "tests", "summarizer.test.yaml")
+	if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	// Test getting existing suite
+	req := httptest.NewRequest("GET", "/api/tests/my-test-suite", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response["name"] != "my-test-suite" {
+		t.Errorf("name = %v, want %q", response["name"], "my-test-suite")
+	}
+
+	if response["prompt"] != "summarizer" {
+		t.Errorf("prompt = %v, want %q", response["prompt"], "summarizer")
+	}
+
+	// Test non-existent suite
+	req = httptest.NewRequest("GET", "/api/tests/nonexistent", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestGetBenchmarkByName(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create a benchmark file
+	benchContent := `name: my-bench-suite
+prompt: summarizer
+description: Benchmark for summarizer
+models:
+  - gpt-4o
+  - gpt-4o-mini
+  - claude-sonnet
+runs_per_model: 5
+`
+	benchPath := filepath.Join(tmpDir, "benchmarks", "summarizer.bench.yaml")
+	if err := os.WriteFile(benchPath, []byte(benchContent), 0644); err != nil {
+		t.Fatalf("failed to write benchmark file: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	// Test getting existing suite
+	req := httptest.NewRequest("GET", "/api/benchmarks/my-bench-suite", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response["name"] != "my-bench-suite" {
+		t.Errorf("name = %v, want %q", response["name"], "my-bench-suite")
+	}
+
+	if response["prompt"] != "summarizer" {
+		t.Errorf("prompt = %v, want %q", response["prompt"], "summarizer")
+	}
+
+	models := response["models"].([]interface{})
+	if len(models) != 3 {
+		t.Errorf("models count = %d, want 3", len(models))
+	}
+
+	// Test non-existent suite
+	req = httptest.NewRequest("GET", "/api/benchmarks/nonexistent", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestTestRunEndpoint(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create a test file
+	testContent := `name: runnable-test
+prompt: summarizer
+tests:
+  - name: simple-test
+    inputs:
+      text: "hello"
+    assertions:
+      - type: not_empty
+`
+	testPath := filepath.Join(tmpDir, "tests", "runnable.test.yaml")
+	if err := os.WriteFile(testPath, []byte(testContent), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	// POST to run endpoint
+	req := httptest.NewRequest("POST", "/api/tests/runnable-test/run", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	// Should succeed (even without actual executor)
+	if rec.Code != http.StatusOK && rec.Code != http.StatusInternalServerError {
+		t.Errorf("unexpected status = %d", rec.Code)
+	}
+
+	// Test run on non-existent test
+	req = httptest.NewRequest("POST", "/api/tests/nonexistent/run", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	// Test wrong method on run endpoint
+	req = httptest.NewRequest("GET", "/api/tests/runnable-test/run", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestBenchmarkRunEndpoint(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create a benchmark file
+	benchContent := `name: runnable-bench
+prompt: summarizer
+models:
+  - gpt-4o-mini
+runs_per_model: 1
+`
+	benchPath := filepath.Join(tmpDir, "benchmarks", "runnable.bench.yaml")
+	if err := os.WriteFile(benchPath, []byte(benchContent), 0644); err != nil {
+		t.Fatalf("failed to write benchmark file: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	// Test run on non-existent benchmark
+	req := httptest.NewRequest("POST", "/api/benchmarks/nonexistent/run", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	// Test wrong method on run endpoint
+	req = httptest.NewRequest("GET", "/api/benchmarks/runnable-bench/run", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestMissingPromptID(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Test missing prompt ID
+	req := httptest.NewRequest("GET", "/api/prompts/", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestMissingTestName(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Test missing test name
+	req := httptest.NewRequest("GET", "/api/tests/", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestMissingBenchmarkName(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Test missing benchmark name
+	req := httptest.NewRequest("GET", "/api/benchmarks/", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
