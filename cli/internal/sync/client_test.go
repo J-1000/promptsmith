@@ -198,6 +198,92 @@ func TestLoginFailed(t *testing.T) {
 	}
 }
 
+func TestLoginWithToken(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/auth/me" {
+			t.Errorf("expected /api/auth/me, got %s", r.URL.Path)
+		}
+		if r.Header.Get("Authorization") != "Bearer valid-token" {
+			t.Errorf("expected auth header 'Bearer valid-token'")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(UserInfo{
+			ID:    "user-123",
+			Email: "token@example.com",
+			Name:  "Token User",
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	user, err := client.LoginWithToken("valid-token")
+	if err != nil {
+		t.Fatalf("login with token failed: %v", err)
+	}
+	if user.Email != "token@example.com" {
+		t.Errorf("expected email 'token@example.com', got %s", user.Email)
+	}
+	if client.token != "valid-token" {
+		t.Error("expected client token to be set")
+	}
+}
+
+func TestLoginWithTokenFailed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(APIError{
+			Code:    "unauthorized",
+			Message: "Invalid token",
+		})
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	_, err := client.LoginWithToken("invalid-token")
+	if err == nil {
+		t.Error("expected error for invalid token")
+	}
+}
+
+func TestLogout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/api/auth/logout" {
+			t.Errorf("expected /api/auth/logout, got %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	client.SetToken("test-token")
+	err := client.Logout()
+	if err != nil {
+		t.Fatalf("logout failed: %v", err)
+	}
+	if client.token != "" {
+		t.Error("expected client token to be cleared")
+	}
+}
+
+func TestLogoutFailed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL)
+	client.SetToken("test-token")
+	err := client.Logout()
+	if err == nil {
+		t.Error("expected error for failed logout")
+	}
+}
+
 func TestPush(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" {
