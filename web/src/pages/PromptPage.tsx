@@ -233,6 +233,9 @@ export function PromptPage() {
         <div className={styles.headerLeft}>
           <h1 className={styles.title}>{name}</h1>
           {prompt?.version && <span className={styles.version}>v{prompt.version}</span>}
+          {versions.length > 0 && versions[0].tags.map((tag) => (
+            <span key={tag} className={styles.headerTag}>{tag}</span>
+          ))}
         </div>
         <div className={styles.tabs}>
           <button
