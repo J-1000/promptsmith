@@ -2287,3 +2287,205 @@ tests:
 		t.Fatalf("runTest should handle missing prompt gracefully: %v", err)
 	}
 }
+
+// ============================================================================
+// Benchmark Command Integration Tests
+// ============================================================================
+
+// createBenchmarkSuite creates a benchmark suite YAML file for testing
+func createBenchmarkSuite(t *testing.T, tmpDir, name, content string) {
+	t.Helper()
+	benchDir := filepath.Join(tmpDir, "benchmarks")
+	suitePath := filepath.Join(benchDir, name+".bench.yaml")
+	if err := os.WriteFile(suitePath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write benchmark suite file: %v", err)
+	}
+}
+
+func TestBenchmarkCommandNoSuites(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Reset flags
+	benchModels = ""
+	benchRuns = 0
+	benchVersion = ""
+	benchOutput = ""
+
+	// Run benchmark command with no suites - should not error
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark with no suites failed: %v", err)
+	}
+}
+
+func TestBenchmarkCommandSuiteDiscovery(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "benchable", `---
+name: benchable
+---
+Hello!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a benchmark suite
+	createBenchmarkSuite(t, tmpDir, "benchable", `
+name: benchable-benchmark
+prompt: benchable
+models:
+  - gpt-4o-mini
+runs_per_model: 1
+`)
+
+	// Reset flags
+	benchModels = ""
+	benchRuns = 0
+	benchVersion = ""
+	benchOutput = ""
+
+	// Run benchmark command
+	// Note: This will fail gracefully since we don't have API keys
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark failed: %v", err)
+	}
+}
+
+func TestBenchmarkCommandModelOverride(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "override", `---
+name: override
+---
+Hello!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a benchmark suite
+	createBenchmarkSuite(t, tmpDir, "override", `
+name: override-benchmark
+prompt: override
+models:
+  - gpt-4o
+runs_per_model: 1
+`)
+
+	// Override models via flag
+	benchModels = "gpt-4o-mini"
+	benchRuns = 0
+	benchVersion = ""
+	benchOutput = ""
+
+	// Run benchmark command
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark with model override failed: %v", err)
+	}
+}
+
+func TestBenchmarkCommandRunsOverride(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "runs", `---
+name: runs
+---
+Hello!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a benchmark suite
+	createBenchmarkSuite(t, tmpDir, "runs", `
+name: runs-benchmark
+prompt: runs
+models:
+  - gpt-4o-mini
+runs_per_model: 5
+`)
+
+	// Override runs via flag
+	benchModels = ""
+	benchRuns = 2
+	benchVersion = ""
+	benchOutput = ""
+
+	// Run benchmark command
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark with runs override failed: %v", err)
+	}
+}
+
+func TestBenchmarkCommandVersionOverride(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "version.prompt")
+
+	// Create v1
+	os.WriteFile(promptPath, []byte("---\nname: version\n---\nV1"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/version.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create v2
+	os.WriteFile(promptPath, []byte("---\nname: version\n---\nV2"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a benchmark suite
+	createBenchmarkSuite(t, tmpDir, "version", `
+name: version-benchmark
+prompt: version
+models:
+  - gpt-4o-mini
+runs_per_model: 1
+`)
+
+	// Override version via flag
+	benchModels = ""
+	benchRuns = 0
+	benchVersion = "1.0.0"
+	benchOutput = ""
+
+	// Run benchmark command
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark with version override failed: %v", err)
+	}
+}
+
+func TestBenchmarkCommandPromptNotFound(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create a benchmark suite for non-existent prompt
+	createBenchmarkSuite(t, tmpDir, "missing", `
+name: missing-benchmark
+prompt: nonexistent
+models:
+  - gpt-4o-mini
+runs_per_model: 1
+`)
+
+	// Reset flags
+	benchModels = ""
+	benchRuns = 0
+	benchVersion = ""
+	benchOutput = ""
+
+	// Run benchmark command - should handle missing prompt gracefully
+	err := runBenchmark(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runBenchmark should handle missing prompt gracefully: %v", err)
+	}
+}
