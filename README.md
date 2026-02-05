@@ -12,6 +12,7 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Testing** — Define test suites with 15+ assertion types
 - **Benchmarking** — Compare prompts across OpenAI and Anthropic models
 - **AI Generation** — Generate variations, compress, or expand prompts with LLMs
+- **Cloud Sync** — Push and pull prompts to/from remote for collaboration
 
 ## Installation
 
@@ -83,6 +84,10 @@ promptsmith log
 | `promptsmith generate <prompt>` | Generate prompt variations with AI |
 | `promptsmith config` | View/modify project configuration |
 | `promptsmith serve` | Start API server for web UI integration |
+| `promptsmith login` | Authenticate with PromptSmith cloud |
+| `promptsmith logout` | Log out from PromptSmith cloud |
+| `promptsmith push` | Sync local changes to cloud |
+| `promptsmith pull` | Fetch latest from cloud |
 
 Version references support `HEAD`, `HEAD~1`, `HEAD~2`, etc.
 
@@ -316,13 +321,62 @@ promptsmith serve --port 3000  # Custom port
 - `POST /api/benchmarks/:name/run` — Run benchmark
 - `POST /api/generate` — Generate prompt variations
 
+## Cloud Sync
+
+Sync your prompts with the PromptSmith cloud for backup and team collaboration.
+
+### Authentication
+
+```bash
+# Interactive login
+promptsmith login
+
+# Token-based login (for CI/CD)
+promptsmith login --token <your-token>
+
+# Or use environment variable
+export PROMPTSMITH_TOKEN=<your-token>
+
+# Log out
+promptsmith logout
+```
+
+### Syncing
+
+```bash
+# Push local changes to cloud
+promptsmith push
+
+# Pull remote changes
+promptsmith pull
+
+# Force push (overwrite remote conflicts)
+promptsmith push --force
+
+# Force pull (overwrite local changes)
+promptsmith pull --force
+```
+
+### Configuration
+
+```bash
+# Set remote URL (defaults to https://api.promptsmith.dev)
+promptsmith config sync.remote https://your-server.com
+
+# Enable auto-push on commit
+promptsmith config sync.auto_push true
+
+# Set team for collaboration
+promptsmith config sync.team my-team
+```
+
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
 - [x] **Phase 2**: Diff, tags, web UI scaffolding
 - [x] **Phase 3**: Testing framework with 15+ assertion types
 - [x] **Phase 4**: Multi-model benchmarking, AI generation, live testing
-- [ ] **Phase 5**: Cloud sync, collaboration
+- [x] **Phase 5**: Cloud sync, collaboration
 
 ## License
 
