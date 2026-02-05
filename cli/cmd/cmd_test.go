@@ -2051,3 +2051,239 @@ func TestCheckoutCommandVersionNotFound(t *testing.T) {
 		t.Error("expected error for non-existent version")
 	}
 }
+
+// ============================================================================
+// Test Command Integration Tests
+// ============================================================================
+
+// createTestSuite creates a test suite YAML file for testing
+func createTestSuite(t *testing.T, tmpDir, name, content string) {
+	t.Helper()
+	testsDir := filepath.Join(tmpDir, "tests")
+	suitePath := filepath.Join(testsDir, name+".test.yaml")
+	if err := os.WriteFile(suitePath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write test suite file: %v", err)
+	}
+}
+
+func TestTestCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt (Go templates use .field syntax)
+	addTestPrompt(t, tmpDir, "greeting", `---
+name: greeting
+description: A greeting prompt
+---
+Hello {{.name}}! Welcome to PromptSmith.
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a test suite
+	createTestSuite(t, tmpDir, "greeting", `
+name: greeting-tests
+prompt: greeting
+tests:
+  - name: basic-test
+    inputs:
+      name: World
+    assertions:
+      - type: not_empty
+      - type: contains
+        value: Hello
+      - type: contains
+        value: World
+`)
+
+	// Reset flags
+	testFilter = ""
+	testVersion = ""
+	testOutput = ""
+	testLive = false
+	testWatch = false
+
+	// Run test command
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest failed: %v", err)
+	}
+}
+
+func TestTestCommandWithFilter(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt (Go templates use .field syntax)
+	addTestPrompt(t, tmpDir, "filtered", `---
+name: filtered
+---
+Hello {{.name}}!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a test suite with multiple tests
+	createTestSuite(t, tmpDir, "filtered", `
+name: filtered-tests
+prompt: filtered
+tests:
+  - name: basic-hello
+    inputs:
+      name: Alice
+    assertions:
+      - type: not_empty
+  - name: basic-world
+    inputs:
+      name: Bob
+    assertions:
+      - type: not_empty
+  - name: advanced-check
+    inputs:
+      name: Charlie
+    assertions:
+      - type: not_empty
+`)
+
+	// Reset and set filter
+	testFilter = "basic"
+	testVersion = ""
+	testOutput = ""
+	testLive = false
+	testWatch = false
+
+	// Run test command with filter - should only run "basic" tests
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest with filter failed: %v", err)
+	}
+}
+
+func TestTestCommandWithVersion(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "versioned.prompt")
+
+	// Create v1
+	os.WriteFile(promptPath, []byte("---\nname: versioned\n---\nVersion ONE"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/versioned.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create v2
+	os.WriteFile(promptPath, []byte("---\nname: versioned\n---\nVersion TWO"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create test suite
+	createTestSuite(t, tmpDir, "versioned", `
+name: versioned-tests
+prompt: versioned
+tests:
+  - name: version-test
+    assertions:
+      - type: not_empty
+`)
+
+	// Test against specific version
+	testFilter = ""
+	testVersion = "1.0.0"
+	testOutput = ""
+	testLive = false
+	testWatch = false
+
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest with version failed: %v", err)
+	}
+}
+
+func TestTestCommandNoSuites(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Reset flags
+	testFilter = ""
+	testVersion = ""
+	testOutput = ""
+	testLive = false
+	testWatch = false
+
+	// Run test command with no suites - should not error
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest with no suites failed: %v", err)
+	}
+}
+
+func TestTestCommandWithOutput(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "output", `---
+name: output
+---
+Hello!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a test suite
+	createTestSuite(t, tmpDir, "output", `
+name: output-tests
+prompt: output
+tests:
+  - name: output-test
+    assertions:
+      - type: not_empty
+`)
+
+	// Set output file
+	outputPath := filepath.Join(tmpDir, "results.json")
+	testFilter = ""
+	testVersion = ""
+	testOutput = outputPath
+	testLive = false
+	testWatch = false
+
+	// Run test command
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest with output failed: %v", err)
+	}
+
+	// Verify output file was created
+	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+		t.Error("expected results.json to be created")
+	}
+}
+
+func TestTestCommandPromptNotFound(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create a test suite for non-existent prompt
+	createTestSuite(t, tmpDir, "missing", `
+name: missing-tests
+prompt: nonexistent
+tests:
+  - name: test
+    assertions:
+      - type: not_empty
+`)
+
+	// Reset flags
+	testFilter = ""
+	testVersion = ""
+	testOutput = ""
+	testLive = false
+	testWatch = false
+
+	// Run test command - should handle missing prompt gracefully
+	err := runTest(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runTest should handle missing prompt gracefully: %v", err)
+	}
+}
