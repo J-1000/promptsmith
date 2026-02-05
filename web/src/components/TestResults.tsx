@@ -113,7 +113,12 @@ function TestResultRow({ test }: { test: TestResult }) {
           {test.failures.map((f, idx) => (
             <div key={idx} className={styles.failure}>
               <span className={styles.failureType}>{f.type}</span>
-              <span className={styles.failureMessage}>{f.message}</span>
+              {f.message && <span className={styles.failureMessage}>{f.message}</span>}
+              {!f.message && (
+                <span className={styles.failureMessage}>
+                  expected {f.expected}, got {f.actual}
+                </span>
+              )}
             </div>
           ))}
         </div>
