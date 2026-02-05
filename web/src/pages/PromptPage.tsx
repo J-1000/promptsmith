@@ -41,6 +41,18 @@ export function PromptPage() {
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false)
   const [generateResults, setGenerateResults] = useState<GenerateResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copyToClipboard = async () => {
+    if (!currentContent) return
+    try {
+      await navigator.clipboard.writeText(currentContent)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
 
   useEffect(() => {
     if (!name) return
@@ -276,6 +288,9 @@ export function PromptPage() {
           <div className={styles.codeBlock}>
             <div className={styles.codeHeader}>
               <span className={styles.fileName}>{prompt?.file_path || `${name}.prompt`}</span>
+              <button className={styles.copyButton} onClick={copyToClipboard}>
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
             </div>
             <pre className={styles.code}>{currentContent || 'No content'}</pre>
           </div>

@@ -111,9 +111,27 @@
 .codeHeader {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 12px 16px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.copyButton {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.copyButton:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .fileName {
