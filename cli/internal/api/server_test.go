@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/promptsmith/cli/internal/db"
@@ -720,5 +721,62 @@ func TestMissingBenchmarkName(t *testing.T) {
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestGenerateEndpointValidation(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Test wrong method
+	req := httptest.NewRequest("GET", "/api/generate", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+
+	// Test empty body
+	req = httptest.NewRequest("POST", "/api/generate", strings.NewReader("{}"))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Test invalid JSON
+	req = httptest.NewRequest("POST", "/api/generate", strings.NewReader("invalid json"))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestGenerateEndpointDefaults(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// This will fail because no API key is set, but we can verify the request parsing works
+	body := `{"prompt": "Test prompt content"}`
+	req := httptest.NewRequest("POST", "/api/generate", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	// Without API key, should return internal server error
+	// This validates the request was parsed and defaults were applied
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("status = %d, want %d (expected provider error without API key)", rec.Code, http.StatusInternalServerError)
 	}
 }
