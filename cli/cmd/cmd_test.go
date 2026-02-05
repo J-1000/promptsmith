@@ -2489,3 +2489,143 @@ runs_per_model: 1
 		t.Fatalf("runBenchmark should handle missing prompt gracefully: %v", err)
 	}
 }
+
+// ============================================================================
+// Generate Command Integration Tests
+// ============================================================================
+
+func TestGenerateCommandPromptNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Reset flags
+	genCount = 3
+	genGoal = ""
+	genModel = "gpt-4o-mini"
+	genType = "variations"
+	genOutput = ""
+	genVersion = ""
+
+	// Run generate command with non-existent prompt
+	err := runGenerate(&cobra.Command{}, []string{"nonexistent"})
+	if err == nil {
+		t.Error("expected error for non-existent prompt")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestGenerateCommandVersionNotFound(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "genver", `---
+name: genver
+---
+Hello!
+`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Reset flags with non-existent version
+	genCount = 3
+	genGoal = ""
+	genModel = "gpt-4o-mini"
+	genType = "variations"
+	genOutput = ""
+	genVersion = "9.9.9"
+
+	// Run generate command
+	err := runGenerate(&cobra.Command{}, []string{"genver"})
+	if err == nil {
+		t.Error("expected error for non-existent version")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestGenerateCommandNoVersion(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add a prompt but don't commit
+	addTestPrompt(t, tmpDir, "nover", `Hello!`)
+
+	// Reset flags
+	genCount = 3
+	genGoal = ""
+	genModel = "gpt-4o-mini"
+	genType = "variations"
+	genOutput = ""
+	genVersion = ""
+
+	// Run generate command - should fail because no versions exist
+	err := runGenerate(&cobra.Command{}, []string{"nover"})
+	if err == nil {
+		t.Error("expected error when no versions exist")
+	}
+	if !strings.Contains(err.Error(), "no versions found") {
+		t.Errorf("expected 'no versions found' error, got: %v", err)
+	}
+}
+
+func TestGenerateCommandInvalidType(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Add and commit a prompt
+	addTestPrompt(t, tmpDir, "invalidtype", `Hello!`)
+	commitMessage = "Initial commit"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Reset flags with invalid type
+	genCount = 3
+	genGoal = ""
+	genModel = "gpt-4o-mini"
+	genType = "invalid_type"
+	genOutput = ""
+	genVersion = ""
+
+	// Run generate command - should fail (either due to invalid type or missing API key)
+	err := runGenerate(&cobra.Command{}, []string{"invalidtype"})
+	if err == nil {
+		t.Error("expected error for invalid generation type or missing API key")
+	}
+	// The error could be about missing API key (checked first) or unknown generation type
+	// Both are valid failures - the command should not succeed
+}
+
+func TestGenerateCommandValidTypes(t *testing.T) {
+	// Test that valid generation types are accepted (they'll fail at API level but type parsing works)
+	validTypes := []string{"variations", "compress", "expand", "rephrase"}
+
+	for _, genTypeVal := range validTypes {
+		t.Run(genTypeVal, func(t *testing.T) {
+			tmpDir, cleanup := initTestProject(t)
+			defer cleanup()
+
+			// Add and commit a prompt
+			addTestPrompt(t, tmpDir, "typtest", `Hello!`)
+			commitMessage = "Initial commit"
+			runCommit(&cobra.Command{}, []string{})
+
+			// Reset flags
+			genCount = 1
+			genGoal = ""
+			genModel = "gpt-4o-mini"
+			genType = genTypeVal
+			genOutput = ""
+			genVersion = ""
+
+			// Run generate command - will fail at API level but type should be valid
+			err := runGenerate(&cobra.Command{}, []string{"typtest"})
+			// Error should NOT be about unknown generation type
+			if err != nil && strings.Contains(err.Error(), "unknown generation type") {
+				t.Errorf("type '%s' should be valid but got: %v", genTypeVal, err)
+			}
+		})
+	}
+}
