@@ -21,8 +21,8 @@ export interface BenchmarkResult {
   version: string
   models: ModelResult[]
   durationMs: number
-  startedAt: string
-  completedAt: string
+  startedAt?: string
+  completedAt?: string
 }
 
 interface BenchmarkResultsProps {

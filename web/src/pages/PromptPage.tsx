@@ -1,217 +1,181 @@
 import { useParams, Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createTwoFilesPatch } from 'diff'
 import { DiffViewer } from '../components/DiffViewer'
 import { TestResults, SuiteResult } from '../components/TestResults'
 import { BenchmarkResults, BenchmarkResult } from '../components/BenchmarkResults'
 import { GeneratePanel, GenerateResult, GenerationType } from '../components/GeneratePanel'
+import {
+  getPrompt,
+  getPromptVersions,
+  getPromptDiff,
+  runTest,
+  runBenchmark,
+  generateVariations,
+  Prompt,
+  Version,
+} from '../api'
 import styles from './PromptPage.module.css'
 
-// Mock data - will be replaced with CLI/API integration
-const mockVersions = [
-  {
-    version: '1.0.2',
-    message: 'Add tone parameter for flexibility',
-    date: '2024-01-15 14:32',
-    tags: ['prod'],
-  },
-  {
-    version: '1.0.1',
-    message: 'Fix greeting for edge cases',
-    date: '2024-01-12 09:15',
-    tags: [],
-  },
-  {
-    version: '1.0.0',
-    message: 'Initial version of greeting prompt',
-    date: '2024-01-10 16:45',
-    tags: ['staging'],
-  },
-]
-
-const mockContent = `---
-name: greeting
-description: A friendly greeting prompt
-model_hint: gpt-4o
-variables:
-  - name: user_name
-    type: string
-    required: true
-  - name: tone
-    type: enum
-    options: [formal, casual, friendly]
-    default: friendly
----
-
-You are a helpful assistant. Greet the user {{user_name}} in a {{tone}} manner.
-
-Be warm and welcoming. Keep the greeting concise but personable.`
-
-const mockDiff = `@@ -10,6 +10,9 @@
-   - name: user_name
-     type: string
-     required: true
-+  - name: tone
-+    type: enum
-+    options: [formal, casual, friendly]
-+    default: friendly
- ---
-
--You are a helpful assistant. Greet the user {{user_name}}.
-+You are a helpful assistant. Greet the user {{user_name}} in a {{tone}} manner.
-
--Be warm and welcoming.
-+Be warm and welcoming. Keep the greeting concise but personable.`
-
-const mockTestResults: SuiteResult = {
-  suiteName: 'greeting-tests',
-  promptName: 'greeting',
-  version: '1.0.2',
-  passed: 3,
-  failed: 1,
-  skipped: 1,
-  total: 5,
-  durationMs: 45,
-  results: [
-    {
-      testName: 'basic-greeting',
-      passed: true,
-      skipped: false,
-      durationMs: 8,
-    },
-    {
-      testName: 'formal-tone',
-      passed: true,
-      skipped: false,
-      durationMs: 12,
-    },
-    {
-      testName: 'casual-tone',
-      passed: true,
-      skipped: false,
-      durationMs: 10,
-    },
-    {
-      testName: 'max-length-check',
-      passed: false,
-      skipped: false,
-      durationMs: 11,
-      failures: [
-        {
-          type: 'max_length',
-          message: 'expected at most 50 characters, got 78',
-          expected: '50',
-          actual: '78',
-        },
-      ],
-    },
-    {
-      testName: 'edge-case-empty-name',
-      passed: false,
-      skipped: true,
-      durationMs: 0,
-    },
-  ],
-}
-
-const mockBenchmarkResults: BenchmarkResult = {
-  suiteName: 'greeting-benchmark',
-  promptName: 'greeting',
-  version: '1.0.2',
-  models: [
-    {
-      model: 'gpt-4o',
-      runs: 5,
-      latencyP50Ms: 1850,
-      latencyP99Ms: 2400,
-      latencyAvgMs: 1920,
-      totalTokensAvg: 156,
-      promptTokens: 85,
-      outputTokensAvg: 71,
-      costPerRequest: 0.0012,
-      totalCost: 0.006,
-      errors: 0,
-      errorRate: 0,
-    },
-    {
-      model: 'gpt-4o-mini',
-      runs: 5,
-      latencyP50Ms: 650,
-      latencyP99Ms: 980,
-      latencyAvgMs: 720,
-      totalTokensAvg: 148,
-      promptTokens: 85,
-      outputTokensAvg: 63,
-      costPerRequest: 0.00012,
-      totalCost: 0.0006,
-      errors: 0,
-      errorRate: 0,
-    },
-    {
-      model: 'claude-sonnet',
-      runs: 5,
-      latencyP50Ms: 1200,
-      latencyP99Ms: 1650,
-      latencyAvgMs: 1280,
-      totalTokensAvg: 162,
-      promptTokens: 85,
-      outputTokensAvg: 77,
-      costPerRequest: 0.0018,
-      totalCost: 0.009,
-      errors: 0,
-      errorRate: 0,
-    },
-  ],
-  durationMs: 28500,
-  startedAt: '2025-02-04T10:00:00Z',
-  completedAt: '2025-02-04T10:00:28Z',
+interface VersionDisplay {
+  version: string
+  message: string
+  date: string
+  tags: string[]
+  content: string
 }
 
 export function PromptPage() {
   const { name } = useParams<{ name: string }>()
+  const [prompt, setPrompt] = useState<Prompt | null>(null)
+  const [versions, setVersions] = useState<VersionDisplay[]>([])
+  const [currentContent, setCurrentContent] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
+  const [diffContent, setDiffContent] = useState<string>('')
   const [view, setView] = useState<'content' | 'history' | 'diff' | 'tests' | 'benchmarks' | 'generate'>('content')
-  const [testResults, setTestResults] = useState<SuiteResult | null>(mockTestResults)
+  const [testResults, setTestResults] = useState<SuiteResult | null>(null)
   const [isRunningTests, setIsRunningTests] = useState(false)
-  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult | null>(mockBenchmarkResults)
+  const [benchmarkResults, setBenchmarkResults] = useState<BenchmarkResult | null>(null)
   const [isRunningBenchmark, setIsRunningBenchmark] = useState(false)
   const [generateResults, setGenerateResults] = useState<GenerateResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleRunTests = () => {
+  useEffect(() => {
+    if (!name) return
+
+    Promise.all([getPrompt(name), getPromptVersions(name)])
+      .then(([promptData, versionsData]) => {
+        setPrompt(promptData)
+        const versionDisplays = versionsData.map((v: Version) => ({
+          version: v.version,
+          message: v.commit_message,
+          date: new Date(v.created_at).toLocaleString(),
+          tags: v.tags || [],
+          content: v.content,
+        }))
+        setVersions(versionDisplays)
+        if (versionDisplays.length > 0) {
+          setCurrentContent(versionDisplays[0].content)
+        }
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [name])
+
+  useEffect(() => {
+    if (selectedVersions.length !== 2 || !name) return
+
+    getPromptDiff(name, selectedVersions[0], selectedVersions[1])
+      .then((data) => {
+        const diff = createTwoFilesPatch(
+          `v${data.v1.version}`,
+          `v${data.v2.version}`,
+          data.v1.content,
+          data.v2.content
+        )
+        // Remove the file header lines
+        const lines = diff.split('\n').slice(2)
+        setDiffContent(lines.join('\n'))
+      })
+      .catch(console.error)
+  }, [selectedVersions, name])
+
+  const handleRunTests = async () => {
+    if (!name) return
     setIsRunningTests(true)
-    // Simulate running tests
-    setTimeout(() => {
-      setTestResults(mockTestResults)
-      setIsRunningTests(false)
-    }, 1000)
-  }
-
-  const handleRunBenchmark = () => {
-    setIsRunningBenchmark(true)
-    // Simulate running benchmark
-    setTimeout(() => {
-      setBenchmarkResults(mockBenchmarkResults)
-      setIsRunningBenchmark(false)
-    }, 2000)
-  }
-
-  const handleGenerate = (type: GenerationType, count: number, goal: string) => {
-    setIsGenerating(true)
-    // Simulate generating variations
-    setTimeout(() => {
-      setGenerateResults({
-        original: mockContent,
-        variations: Array.from({ length: count }, (_, i) => ({
-          content: `Variation ${i + 1} of the prompt with ${type} applied.${goal ? ` Goal: ${goal}` : ''}`,
-          description: `${type.charAt(0).toUpperCase() + type.slice(1)} variation ${i + 1}`,
-          tokenDelta: type === 'compress' ? -(10 + i * 5) : type === 'expand' ? (15 + i * 8) : 0,
+    try {
+      const result = await runTest(name)
+      setTestResults({
+        suiteName: result.suite_name,
+        promptName: result.prompt_name,
+        version: result.version,
+        passed: result.passed,
+        failed: result.failed,
+        skipped: result.skipped,
+        total: result.total,
+        durationMs: result.duration_ms,
+        results: result.results.map((r) => ({
+          testName: r.test_name,
+          passed: r.passed,
+          skipped: r.skipped,
+          output: r.output,
+          failures: r.failures?.map((f) => ({
+            type: f.type,
+            message: f.message,
+            expected: f.expected,
+            actual: f.actual,
+          })),
+          error: r.error,
+          durationMs: r.duration_ms,
         })),
-        model: 'gpt-4o-mini',
+      })
+    } catch (err) {
+      console.error('Failed to run tests:', err)
+    } finally {
+      setIsRunningTests(false)
+    }
+  }
+
+  const handleRunBenchmark = async () => {
+    if (!name) return
+    setIsRunningBenchmark(true)
+    try {
+      const result = await runBenchmark(name)
+      setBenchmarkResults({
+        suiteName: result.suite_name,
+        promptName: result.prompt_name,
+        version: result.version,
+        models: result.models.map((m) => ({
+          model: m.model,
+          runs: m.runs,
+          latencyP50Ms: m.latency_p50_ms,
+          latencyP99Ms: m.latency_p99_ms,
+          latencyAvgMs: m.latency_p50_ms,
+          totalTokensAvg: m.total_tokens_avg,
+          promptTokens: 0,
+          outputTokensAvg: m.total_tokens_avg,
+          costPerRequest: m.cost_per_request,
+          totalCost: m.cost_per_request * m.runs,
+          errors: m.errors,
+          errorRate: m.error_rate,
+        })),
+        durationMs: result.duration_ms,
+      })
+    } catch (err) {
+      console.error('Failed to run benchmark:', err)
+    } finally {
+      setIsRunningBenchmark(false)
+    }
+  }
+
+  const handleGenerate = async (type: GenerationType, count: number, goal: string) => {
+    if (!currentContent) return
+    setIsGenerating(true)
+    try {
+      const result = await generateVariations({
         type,
+        prompt: currentContent,
+        count,
         goal: goal || undefined,
       })
+      setGenerateResults({
+        original: result.original,
+        variations: result.variations.map((v) => ({
+          content: v.content,
+          description: v.description,
+          tokenDelta: v.token_delta,
+        })),
+        model: result.model,
+        type: result.type as GenerationType,
+        goal: result.goal,
+      })
+    } catch (err) {
+      console.error('Failed to generate:', err)
+    } finally {
       setIsGenerating(false)
-    }, 1500)
+    }
   }
 
   const toggleVersion = (version: string) => {
@@ -226,6 +190,25 @@ export function PromptPage() {
     })
   }
 
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.loading}>Loading prompt...</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.error}>
+          <p>Failed to load prompt: {error}</p>
+          <Link to="/" className={styles.backLink}>Back to prompts</Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.container}>
       <div className={styles.breadcrumb}>
@@ -237,7 +220,7 @@ export function PromptPage() {
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <h1 className={styles.title}>{name}</h1>
-          <span className={styles.version}>v{mockVersions[0].version}</span>
+          {prompt?.version && <span className={styles.version}>v{prompt.version}</span>}
         </div>
         <div className={styles.tabs}>
           <button
@@ -292,9 +275,9 @@ export function PromptPage() {
         {view === 'content' && (
           <div className={styles.codeBlock}>
             <div className={styles.codeHeader}>
-              <span className={styles.fileName}>{name}.prompt</span>
+              <span className={styles.fileName}>{prompt?.file_path || `${name}.prompt`}</span>
             </div>
-            <pre className={styles.code}>{mockContent}</pre>
+            <pre className={styles.code}>{currentContent || 'No content'}</pre>
           </div>
         )}
 
@@ -303,7 +286,7 @@ export function PromptPage() {
             <p className={styles.historyHint}>
               Select two versions to compare
             </p>
-            {mockVersions.map((v) => (
+            {versions.map((v) => (
               <div
                 key={v.version}
                 className={`${styles.versionRow} ${selectedVersions.includes(v.version) ? styles.versionSelected : ''}`}
@@ -333,7 +316,7 @@ export function PromptPage() {
           <DiffViewer
             oldVersion={selectedVersions[0]}
             newVersion={selectedVersions[1]}
-            diff={mockDiff}
+            diff={diffContent}
           />
         )}
 

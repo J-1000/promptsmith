@@ -7,7 +7,7 @@ export interface TestResult {
   output?: string
   failures?: Array<{
     type: string
-    message: string
+    message?: string
     expected: string
     actual: string
   }>

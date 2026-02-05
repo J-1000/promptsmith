@@ -266,3 +266,25 @@
   color: var(--info);
   border-radius: 4px;
 }
+
+/* Loading and error states */
+.loading,
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--error);
+}
+
+.backLink {
+  color: var(--accent-primary);
+  font-size: 14px;
+}
