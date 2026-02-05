@@ -106,4 +106,34 @@ describe('HomePage', () => {
       expect(screen.getByText(/no prompts tracked yet/i)).toBeInTheDocument()
     })
   })
+
+  it('filters prompts by search query', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithRouter(<HomePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('greeting')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByPlaceholderText(/search prompts/i)
+    await user.type(searchInput, 'greeting')
+
+    expect(screen.getByText('greeting')).toBeInTheDocument()
+    expect(screen.queryByText('summarize')).not.toBeInTheDocument()
+    expect(screen.queryByText('code-review')).not.toBeInTheDocument()
+  })
+
+  it('shows no results message when search has no matches', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithRouter(<HomePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('greeting')).toBeInTheDocument()
+    })
+
+    const searchInput = screen.getByPlaceholderText(/search prompts/i)
+    await user.type(searchInput, 'nonexistent')
+
+    expect(screen.getByText(/no prompts matching "nonexistent"/i)).toBeInTheDocument()
+  })
 })
