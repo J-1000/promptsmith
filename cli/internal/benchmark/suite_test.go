@@ -1,6 +1,8 @@
 package benchmark
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -123,5 +125,111 @@ func TestModelResult(t *testing.T) {
 	}
 	if result.Runs != 10 {
 		t.Errorf("expected 10 runs, got %d", result.Runs)
+	}
+}
+
+func TestParseSuiteFile(t *testing.T) {
+	// Create a temp file
+	tmpDir, err := os.MkdirTemp("", "suite-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Valid suite file
+	validContent := `name: test-suite
+prompt: test-prompt
+models:
+  - gpt-4o
+`
+	validPath := filepath.Join(tmpDir, "valid.bench.yaml")
+	if err := os.WriteFile(validPath, []byte(validContent), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	suite, err := ParseSuiteFile(validPath)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if suite.Name != "test-suite" {
+		t.Errorf("expected name 'test-suite', got '%s'", suite.Name)
+	}
+
+	// Non-existent file
+	_, err = ParseSuiteFile(filepath.Join(tmpDir, "nonexistent.yaml"))
+	if err == nil {
+		t.Error("expected error for non-existent file")
+	}
+
+	// Invalid YAML file
+	invalidPath := filepath.Join(tmpDir, "invalid.yaml")
+	if err := os.WriteFile(invalidPath, []byte("name: test\n  invalid: yaml"), 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+	_, err = ParseSuiteFile(invalidPath)
+	if err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestParseSuiteRunsPerModelDefault(t *testing.T) {
+	yaml := `name: test
+prompt: test
+models:
+  - gpt-4o
+`
+	suite, err := ParseSuite([]byte(yaml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if suite.RunsPerModel != 3 {
+		t.Errorf("expected default runs_per_model 3, got %d", suite.RunsPerModel)
+	}
+}
+
+func TestParseSuiteWithVariables(t *testing.T) {
+	yaml := `name: test
+prompt: test
+models:
+  - gpt-4o
+variables:
+  max_tokens: 500
+  temperature: 0.7
+`
+	suite, err := ParseSuite([]byte(yaml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if suite.Variables == nil {
+		t.Fatal("expected variables to be set")
+	}
+
+	if suite.Variables["max_tokens"] != 500 {
+		t.Errorf("expected max_tokens 500, got %v", suite.Variables["max_tokens"])
+	}
+}
+
+func TestBenchmarkResultStruct(t *testing.T) {
+	result := BenchmarkResult{
+		SuiteName:   "test-suite",
+		PromptName:  "test-prompt",
+		Version:     "1.0.0",
+		Models:      []ModelResult{{Model: "gpt-4o"}},
+		Runs:        []RunResult{{Model: "gpt-4o", LatencyMs: 100}},
+		DurationMs:  5000,
+		StartedAt:   "2025-01-01T00:00:00Z",
+		CompletedAt: "2025-01-01T00:00:05Z",
+	}
+
+	if result.SuiteName != "test-suite" {
+		t.Errorf("expected suite name 'test-suite', got '%s'", result.SuiteName)
+	}
+	if len(result.Models) != 1 {
+		t.Errorf("expected 1 model result, got %d", len(result.Models))
+	}
+	if len(result.Runs) != 1 {
+		t.Errorf("expected 1 run result, got %d", len(result.Runs))
 	}
 }
