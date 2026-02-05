@@ -276,9 +276,13 @@ Detected patterns:
 PromptSmith includes a web interface for browsing prompts and managing tests/benchmarks.
 
 ```bash
+# Start the API server (in your project directory)
+promptsmith serve  # Runs on http://localhost:8080
+
+# Start the web UI
 cd web
 npm install
-npm run dev    # http://localhost:5173
+npm run dev        # Runs on http://localhost:8081
 ```
 
 Features:
@@ -288,6 +292,29 @@ Features:
 - Test results dashboard with pass/fail indicators
 - Benchmark results with model comparison table
 - AI-powered prompt variation generator
+
+### API Server
+
+The `serve` command starts a REST API for integration:
+
+```bash
+promptsmith serve              # Default: http://localhost:8080
+promptsmith serve --port 3000  # Custom port
+```
+
+**Endpoints:**
+- `GET  /api/project` — Project info
+- `GET  /api/prompts` — List all prompts
+- `GET  /api/prompts/:name` — Get prompt details
+- `GET  /api/prompts/:name/versions` — List versions
+- `GET  /api/prompts/:name/diff?v1=X&v2=Y` — Version diff
+- `GET  /api/tests` — List test suites
+- `GET  /api/tests/:name` — Get test suite
+- `POST /api/tests/:name/run` — Run test suite
+- `GET  /api/benchmarks` — List benchmarks
+- `GET  /api/benchmarks/:name` — Get benchmark
+- `POST /api/benchmarks/:name/run` — Run benchmark
+- `POST /api/generate` — Generate prompt variations
 
 ## Roadmap
 
