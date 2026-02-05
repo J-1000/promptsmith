@@ -1757,3 +1757,158 @@ func TestDiffCommandVersionNotFound(t *testing.T) {
 		t.Error("expected error for non-existent version")
 	}
 }
+
+// ============================================================================
+// Tag Command Integration Tests
+// ============================================================================
+
+func TestTagCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "tagtest.prompt")
+	os.WriteFile(promptPath, []byte("Content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/tagtest.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create a tag
+	tagList = false
+	tagDelete = false
+	err := runTag(&cobra.Command{}, []string{"tagtest", "prod"})
+	if err != nil {
+		t.Fatalf("runTag failed: %v", err)
+	}
+
+	// Verify tag was created
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("tagtest")
+	tags, _ := database.ListTags(prompt.ID)
+	if len(tags) != 1 {
+		t.Fatalf("expected 1 tag, got %d", len(tags))
+	}
+	if tags[0].Name != "prod" {
+		t.Errorf("expected tag 'prod', got %s", tags[0].Name)
+	}
+}
+
+func TestTagCommandWithVersion(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "tagver.prompt")
+
+	// Create multiple versions
+	os.WriteFile(promptPath, []byte("V1"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/tagver.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V2"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Tag specific version
+	tagList = false
+	tagDelete = false
+	err := runTag(&cobra.Command{}, []string{"tagver", "stable", "1.0.0"})
+	if err != nil {
+		t.Fatalf("runTag failed: %v", err)
+	}
+
+	// Verify tag points to correct version
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("tagver")
+	tags, _ := database.ListTags(prompt.ID)
+	if len(tags) != 1 {
+		t.Fatalf("expected 1 tag, got %d", len(tags))
+	}
+
+	// Get version for tag
+	version, _ := database.GetVersionByID(tags[0].VersionID)
+	if version.Version != "1.0.0" {
+		t.Errorf("expected tag to point to 1.0.0, got %s", version.Version)
+	}
+}
+
+func TestTagCommandList(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "taglist.prompt")
+	os.WriteFile(promptPath, []byte("Content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/taglist.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create multiple tags
+	tagList = false
+	tagDelete = false
+	runTag(&cobra.Command{}, []string{"taglist", "prod"})
+	runTag(&cobra.Command{}, []string{"taglist", "staging"})
+
+	// List tags
+	tagList = true
+	err := runTag(&cobra.Command{}, []string{"taglist"})
+	if err != nil {
+		t.Fatalf("runTag --list failed: %v", err)
+	}
+}
+
+func TestTagCommandDelete(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "tagdel.prompt")
+	os.WriteFile(promptPath, []byte("Content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/tagdel.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create tag
+	tagList = false
+	tagDelete = false
+	runTag(&cobra.Command{}, []string{"tagdel", "temp"})
+
+	// Delete tag
+	tagDelete = true
+	err := runTag(&cobra.Command{}, []string{"tagdel", "temp"})
+	if err != nil {
+		t.Fatalf("runTag --delete failed: %v", err)
+	}
+
+	// Verify tag was deleted
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("tagdel")
+	tags, _ := database.ListTags(prompt.ID)
+	if len(tags) != 0 {
+		t.Errorf("expected 0 tags after deletion, got %d", len(tags))
+	}
+}
+
+func TestTagCommandPromptNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	tagList = false
+	tagDelete = false
+	err := runTag(&cobra.Command{}, []string{"nonexistent", "tag"})
+	if err == nil {
+		t.Error("expected error for non-existent prompt")
+	}
+}
