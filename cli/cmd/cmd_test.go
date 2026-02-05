@@ -752,3 +752,77 @@ func TestShowPromptDetails(t *testing.T) {
 		t.Error("expected 'prod' tag")
 	}
 }
+
+// ============================================================================
+// Remove Command Tests
+// ============================================================================
+
+func TestRemovePrompt(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+
+	prompt, _ := database.GetPromptByName("summarizer")
+
+	// Create versions and tags
+	v1, _ := database.CreateVersion(prompt.ID, "1.0.0", "v1", "[]", "{}", "First", "user", nil)
+	database.CreateVersion(prompt.ID, "1.0.1", "v2", "[]", "{}", "Second", "user", &v1.ID)
+	database.CreateTag(prompt.ID, v1.ID, "prod")
+
+	// Verify data exists
+	versions, _ := database.ListVersions(prompt.ID)
+	if len(versions) != 2 {
+		t.Errorf("expected 2 versions, got %d", len(versions))
+	}
+
+	tags, _ := database.ListTags(prompt.ID)
+	if len(tags) != 1 {
+		t.Errorf("expected 1 tag, got %d", len(tags))
+	}
+
+	// Remove the prompt (simulating what remove command does)
+	_, err = database.Exec("DELETE FROM tags WHERE prompt_id = ?", prompt.ID)
+	if err != nil {
+		t.Fatalf("failed to delete tags: %v", err)
+	}
+
+	_, err = database.Exec("DELETE FROM prompt_versions WHERE prompt_id = ?", prompt.ID)
+	if err != nil {
+		t.Fatalf("failed to delete versions: %v", err)
+	}
+
+	_, err = database.Exec("DELETE FROM prompts WHERE id = ?", prompt.ID)
+	if err != nil {
+		t.Fatalf("failed to delete prompt: %v", err)
+	}
+
+	// Verify prompt is gone
+	p, _ := database.GetPromptByName("summarizer")
+	if p != nil {
+		t.Error("prompt should be deleted")
+	}
+
+	// Verify versions are gone
+	versions, _ = database.ListVersions(prompt.ID)
+	if len(versions) != 0 {
+		t.Errorf("expected 0 versions, got %d", len(versions))
+	}
+
+	// Verify tags are gone
+	tags, _ = database.ListTags(prompt.ID)
+	if len(tags) != 0 {
+		t.Errorf("expected 0 tags, got %d", len(tags))
+	}
+
+	// Verify the file still exists
+	promptPath := filepath.Join(tmpDir, "prompts", "summarizer.prompt")
+	if _, err := os.Stat(promptPath); os.IsNotExist(err) {
+		t.Error("prompt file should NOT be deleted")
+	}
+
+	database.Close()
+}
