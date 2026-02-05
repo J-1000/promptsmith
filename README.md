@@ -69,6 +69,7 @@ promptsmith log
 | `promptsmith commit -m "msg"` | Create new version for changed prompts |
 | `promptsmith status` | Show project status and uncommitted changes |
 | `promptsmith list` | List all tracked prompts with versions |
+| `promptsmith show <prompt>` | Display prompt details and content |
 | `promptsmith log` | Show version history |
 | `promptsmith log -p <name>` | Show history for specific prompt |
 | `promptsmith diff <prompt> [v1] [v2]` | Compare versions (unified diff) |
