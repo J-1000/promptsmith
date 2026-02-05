@@ -1,6 +1,6 @@
 // API client for PromptSmith backend
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface Project {
   id: string;
