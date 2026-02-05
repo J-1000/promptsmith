@@ -157,3 +157,34 @@ export async function getBenchmark(name: string): Promise<BenchmarkSuite> {
 export async function runBenchmark(name: string): Promise<BenchmarkResult> {
   return fetchApi<BenchmarkResult>(`/api/benchmarks/${name}/run`, { method: 'POST' });
 }
+
+// Generate
+
+export interface GenerateVariation {
+  content: string;
+  description: string;
+  token_delta?: number;
+}
+
+export interface GenerateResult {
+  original: string;
+  variations: GenerateVariation[];
+  model: string;
+  type: string;
+  goal?: string;
+}
+
+export interface GenerateRequest {
+  type: 'variations' | 'compress' | 'expand' | 'rephrase';
+  prompt: string;
+  count?: number;
+  goal?: string;
+  model?: string;
+}
+
+export async function generateVariations(request: GenerateRequest): Promise<GenerateResult> {
+  return fetchApi<GenerateResult>('/api/generate', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
