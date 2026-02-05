@@ -1634,3 +1634,126 @@ func TestLogCommandLimit(t *testing.T) {
 	}
 	// The log should only show 2 entries (limit applies to display, not verification)
 }
+
+// ============================================================================
+// Diff Command Integration Tests
+// ============================================================================
+
+func TestDiffCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create and commit a prompt
+	promptPath := filepath.Join(tmpDir, "prompts", "difftest.prompt")
+	os.WriteFile(promptPath, []byte("Line 1\nLine 2\nLine 3"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/difftest.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Modify the file
+	os.WriteFile(promptPath, []byte("Line 1\nModified Line 2\nLine 3"), 0644)
+
+	// Run diff (working vs latest)
+	err := runDiff(&cobra.Command{}, []string{"difftest"})
+	if err != nil {
+		t.Fatalf("runDiff failed: %v", err)
+	}
+}
+
+func TestDiffCommandTwoVersions(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "twover.prompt")
+
+	// Create v1
+	os.WriteFile(promptPath, []byte("Version 1 content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/twover.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Create v2
+	os.WriteFile(promptPath, []byte("Version 2 content"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Diff between two versions
+	err := runDiff(&cobra.Command{}, []string{"twover", "1.0.0", "1.0.1"})
+	if err != nil {
+		t.Fatalf("runDiff failed: %v", err)
+	}
+}
+
+func TestDiffCommandHeadNotation(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "headtest.prompt")
+
+	// Create multiple versions
+	os.WriteFile(promptPath, []byte("V1"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/headtest.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V2"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V3"), 0644)
+	commitMessage = "V3"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Diff using HEAD notation
+	err := runDiff(&cobra.Command{}, []string{"headtest", "HEAD~2", "HEAD"})
+	if err != nil {
+		t.Fatalf("runDiff failed: %v", err)
+	}
+}
+
+func TestDiffCommandNoDifferences(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "nodiff.prompt")
+	os.WriteFile(promptPath, []byte("Same content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/nodiff.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// File unchanged, diff should show "No differences"
+	err := runDiff(&cobra.Command{}, []string{"nodiff"})
+	if err != nil {
+		t.Fatalf("runDiff failed: %v", err)
+	}
+}
+
+func TestDiffCommandPromptNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	err := runDiff(&cobra.Command{}, []string{"nonexistent"})
+	if err == nil {
+		t.Error("expected error for non-existent prompt")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestDiffCommandVersionNotFound(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "vernotfound.prompt")
+	os.WriteFile(promptPath, []byte("Content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/vernotfound.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Try to diff with non-existent version
+	err := runDiff(&cobra.Command{}, []string{"vernotfound", "9.9.9"})
+	if err == nil {
+		t.Error("expected error for non-existent version")
+	}
+}
