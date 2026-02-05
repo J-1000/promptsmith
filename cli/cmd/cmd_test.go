@@ -1120,3 +1120,197 @@ func TestInitCommandAlreadyInitialized(t *testing.T) {
 		t.Errorf("expected 'already initialized' error, got: %v", err)
 	}
 }
+
+// ============================================================================
+// Add Command Integration Tests
+// ============================================================================
+
+// initTestProject initializes a project and returns the temp dir and cleanup func
+func initTestProject(t *testing.T) (string, func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "promptsmith-cmd-integration-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+
+	originalWd, _ := os.Getwd()
+	os.Chdir(tmpDir)
+
+	err = runInit(&cobra.Command{}, []string{"test-project"})
+	if err != nil {
+		os.Chdir(originalWd)
+		os.RemoveAll(tmpDir)
+		t.Fatalf("failed to initialize project: %v", err)
+	}
+
+	cleanup := func() {
+		os.Chdir(originalWd)
+		os.RemoveAll(tmpDir)
+	}
+
+	return tmpDir, cleanup
+}
+
+func TestAddCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create a prompt file
+	promptContent := `---
+name: greeting
+description: A greeting prompt
+model_hint: gpt-4o
+---
+
+Hello {{name}}, welcome to PromptSmith!
+`
+	promptPath := filepath.Join(tmpDir, "prompts", "greeting.prompt")
+	if err := os.WriteFile(promptPath, []byte(promptContent), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+
+	// Run add command
+	err := runAdd(&cobra.Command{}, []string{"prompts/greeting.prompt"})
+	if err != nil {
+		t.Fatalf("runAdd failed: %v", err)
+	}
+
+	// Verify prompt was added
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, err := database.GetPromptByName("greeting")
+	if err != nil {
+		t.Fatalf("failed to get prompt: %v", err)
+	}
+	if prompt == nil {
+		t.Fatal("expected prompt to be tracked")
+	}
+	if prompt.Description != "A greeting prompt" {
+		t.Errorf("expected description 'A greeting prompt', got %q", prompt.Description)
+	}
+}
+
+func TestAddCommandNoFrontmatter(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create a prompt file without frontmatter
+	promptContent := `Hello {{name}}, welcome!`
+	promptPath := filepath.Join(tmpDir, "prompts", "simple.prompt")
+	if err := os.WriteFile(promptPath, []byte(promptContent), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+
+	// Run add command
+	err := runAdd(&cobra.Command{}, []string{"prompts/simple.prompt"})
+	if err != nil {
+		t.Fatalf("runAdd failed: %v", err)
+	}
+
+	// Verify prompt was added with filename as name
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, err := database.GetPromptByName("simple")
+	if err != nil {
+		t.Fatalf("failed to get prompt: %v", err)
+	}
+	if prompt == nil {
+		t.Fatal("expected prompt to be tracked")
+	}
+}
+
+func TestAddCommandFileNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to add a file that doesn't exist
+	err := runAdd(&cobra.Command{}, []string{"prompts/nonexistent.prompt"})
+	if err == nil {
+		t.Error("expected error when adding non-existent file")
+	}
+}
+
+func TestAddCommandAlreadyTracked(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create a prompt file
+	promptContent := `---
+name: duplicate
+description: Test duplicate
+---
+Hello!
+`
+	promptPath := filepath.Join(tmpDir, "prompts", "duplicate.prompt")
+	if err := os.WriteFile(promptPath, []byte(promptContent), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+
+	// Add it once
+	err := runAdd(&cobra.Command{}, []string{"prompts/duplicate.prompt"})
+	if err != nil {
+		t.Fatalf("first add failed: %v", err)
+	}
+
+	// Try to add again
+	err = runAdd(&cobra.Command{}, []string{"prompts/duplicate.prompt"})
+	if err == nil {
+		t.Error("expected error when adding already tracked file")
+	}
+	if !strings.Contains(err.Error(), "already tracked") {
+		t.Errorf("expected 'already tracked' error, got: %v", err)
+	}
+}
+
+func TestAddCommandNameCollision(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Create first prompt
+	promptContent1 := `---
+name: collision
+description: First prompt
+---
+Hello!
+`
+	promptPath1 := filepath.Join(tmpDir, "prompts", "first.prompt")
+	if err := os.WriteFile(promptPath1, []byte(promptContent1), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+
+	// Add first prompt
+	err := runAdd(&cobra.Command{}, []string{"prompts/first.prompt"})
+	if err != nil {
+		t.Fatalf("first add failed: %v", err)
+	}
+
+	// Create second prompt with same name in frontmatter
+	promptContent2 := `---
+name: collision
+description: Second prompt with same name
+---
+World!
+`
+	promptPath2 := filepath.Join(tmpDir, "prompts", "second.prompt")
+	if err := os.WriteFile(promptPath2, []byte(promptContent2), 0644); err != nil {
+		t.Fatalf("failed to write prompt file: %v", err)
+	}
+
+	// Try to add - should fail due to name collision
+	err = runAdd(&cobra.Command{}, []string{"prompts/second.prompt"})
+	if err == nil {
+		t.Error("expected error when adding prompt with duplicate name")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' error, got: %v", err)
+	}
+}
