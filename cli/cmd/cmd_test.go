@@ -701,3 +701,54 @@ func TestListPrompts(t *testing.T) {
 
 	database.Close()
 }
+
+// ============================================================================
+// Show Command Tests
+// ============================================================================
+
+func TestShowPromptDetails(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, _ := database.GetPromptByName("summarizer")
+
+	// Create a version
+	promptPath := filepath.Join(tmpDir, "prompts", "summarizer.prompt")
+	content, _ := os.ReadFile(promptPath)
+	v1, _ := database.CreateVersion(prompt.ID, "1.0.0", string(content), "[]", "{}", "Initial", "testuser", nil)
+
+	// Create a tag
+	database.CreateTag(prompt.ID, v1.ID, "prod")
+
+	// Verify we can get the prompt
+	p, err := database.GetPromptByName("summarizer")
+	if err != nil || p == nil {
+		t.Fatal("failed to get prompt by name")
+	}
+
+	// Verify we can get the latest version
+	latestVersion, err := database.GetLatestVersion(p.ID)
+	if err != nil || latestVersion == nil {
+		t.Fatal("failed to get latest version")
+	}
+
+	if latestVersion.Version != "1.0.0" {
+		t.Errorf("version = %q, want %q", latestVersion.Version, "1.0.0")
+	}
+
+	if latestVersion.CreatedBy != "testuser" {
+		t.Errorf("created_by = %q, want %q", latestVersion.CreatedBy, "testuser")
+	}
+
+	// Verify tags
+	tags, _ := database.ListTags(p.ID)
+	if len(tags) != 1 || tags[0].Name != "prod" {
+		t.Error("expected 'prod' tag")
+	}
+}
