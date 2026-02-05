@@ -1,12 +1,14 @@
 package cmd
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/promptsmith/cli/internal/db"
+	"github.com/spf13/cobra"
 )
 
 // Test helper to set up a test project
@@ -988,5 +990,133 @@ func TestConfigDeeplyNestedKey(t *testing.T) {
 	_, err = getConfigValue(config, "completely.unknown.path")
 	if err == nil {
 		t.Error("expected error for unknown top-level key")
+	}
+}
+
+// ============================================================================
+// Init Command Integration Tests
+// ============================================================================
+
+// executeCommand runs a cobra command and captures output
+func executeCommand(root *cobra.Command, args ...string) (string, error) {
+	buf := new(bytes.Buffer)
+	root.SetOut(buf)
+	root.SetErr(buf)
+	root.SetArgs(args)
+	err := root.Execute()
+	return buf.String(), err
+}
+
+func TestInitCommand(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "promptsmith-init-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Change to temp directory
+	originalWd, _ := os.Getwd()
+	defer os.Chdir(originalWd)
+	os.Chdir(tmpDir)
+
+	// Run init command
+	err = runInit(&cobra.Command{}, []string{"test-project"})
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// Verify .promptsmith directory was created
+	configDir := filepath.Join(tmpDir, db.ConfigDir)
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		t.Error("expected .promptsmith directory to exist")
+	}
+
+	// Verify config file was created
+	configPath := filepath.Join(configDir, db.ConfigFile)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Error("expected config.yaml to exist")
+	}
+
+	// Verify database was created
+	dbPath := filepath.Join(configDir, "promptsmith.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		t.Error("expected promptsmith.db to exist")
+	}
+
+	// Verify directories were created
+	expectedDirs := []string{"prompts", "tests", "benchmarks"}
+	for _, dir := range expectedDirs {
+		dirPath := filepath.Join(tmpDir, dir)
+		if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+			t.Errorf("expected %s directory to exist", dir)
+		}
+	}
+
+	// Verify .gitignore was created
+	gitignorePath := filepath.Join(configDir, ".gitignore")
+	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
+		t.Error("expected .gitignore to exist")
+	}
+}
+
+func TestInitCommandDefaultName(t *testing.T) {
+	// Create temp directory with specific name
+	tmpDir, err := os.MkdirTemp("", "my-awesome-project-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Change to temp directory
+	originalWd, _ := os.Getwd()
+	defer os.Chdir(originalWd)
+	os.Chdir(tmpDir)
+
+	// Run init without project name - should use directory name
+	err = runInit(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runInit failed: %v", err)
+	}
+
+	// Load config and verify project name
+	config, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+
+	// Project name should be the directory base name
+	expectedPrefix := "my-awesome-project-"
+	if !strings.HasPrefix(config.Project.Name, expectedPrefix) {
+		t.Errorf("expected project name to start with %q, got %q", expectedPrefix, config.Project.Name)
+	}
+}
+
+func TestInitCommandAlreadyInitialized(t *testing.T) {
+	// Create temp directory
+	tmpDir, err := os.MkdirTemp("", "promptsmith-init-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Change to temp directory
+	originalWd, _ := os.Getwd()
+	defer os.Chdir(originalWd)
+	os.Chdir(tmpDir)
+
+	// Initialize first time
+	err = runInit(&cobra.Command{}, []string{"test-project"})
+	if err != nil {
+		t.Fatalf("first runInit failed: %v", err)
+	}
+
+	// Try to initialize again - should fail
+	err = runInit(&cobra.Command{}, []string{"test-project"})
+	if err == nil {
+		t.Error("expected error when initializing already initialized project")
+	}
+	if !strings.Contains(err.Error(), "already initialized") {
+		t.Errorf("expected 'already initialized' error, got: %v", err)
 	}
 }
