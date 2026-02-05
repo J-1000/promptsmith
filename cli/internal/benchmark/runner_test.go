@@ -1,6 +1,8 @@
 package benchmark
 
 import (
+	"context"
+	"fmt"
 	"testing"
 )
 
@@ -141,5 +143,183 @@ func TestBenchmarkModelNoProvider(t *testing.T) {
 		if run.Error == "" {
 			t.Error("expected error in run result")
 		}
+	}
+}
+
+// mockBenchmarkProvider implements Provider for testing
+// Uses "openai" as name so it matches the GetForModel lookup for gpt-* models
+type mockBenchmarkProvider struct {
+	responses []*CompletionResponse
+	errors    []error
+	callCount int
+}
+
+func (m *mockBenchmarkProvider) Name() string {
+	return "openai" // Use openai so GetProviderForModel finds us for gpt-* models
+}
+
+func (m *mockBenchmarkProvider) Models() []string {
+	return []string{"gpt-4o", "gpt-4o-mini"}
+}
+
+func (m *mockBenchmarkProvider) SupportsModel(model string) bool {
+	return model == "gpt-4o" || model == "gpt-4o-mini"
+}
+
+func (m *mockBenchmarkProvider) Complete(ctx context.Context, req CompletionRequest) (*CompletionResponse, error) {
+	idx := m.callCount
+	m.callCount++
+
+	if idx < len(m.errors) && m.errors[idx] != nil {
+		return nil, m.errors[idx]
+	}
+
+	if idx < len(m.responses) {
+		return m.responses[idx], nil
+	}
+
+	// Default response
+	return &CompletionResponse{
+		Content:      "default response",
+		Model:        req.Model,
+		PromptTokens: 100,
+		OutputTokens: 50,
+		TotalTokens:  150,
+		LatencyMs:    200,
+		Cost:         0.005,
+	}, nil
+}
+
+func TestBenchmarkModelWithMockProvider(t *testing.T) {
+	registry := NewProviderRegistry()
+	provider := &mockBenchmarkProvider{
+		responses: []*CompletionResponse{
+			{LatencyMs: 100, PromptTokens: 100, OutputTokens: 50, TotalTokens: 150, Cost: 0.003},
+			{LatencyMs: 200, PromptTokens: 100, OutputTokens: 60, TotalTokens: 160, Cost: 0.004},
+			{LatencyMs: 150, PromptTokens: 100, OutputTokens: 55, TotalTokens: 155, Cost: 0.0035},
+		},
+	}
+	registry.Register(provider)
+
+	runner := NewRunner(nil, registry)
+	modelResult, runs := runner.benchmarkModel(nil, "gpt-4o", "test prompt", 3)
+
+	if modelResult.Errors != 0 {
+		t.Errorf("expected 0 errors, got %d", modelResult.Errors)
+	}
+	if modelResult.ErrorRate != 0 {
+		t.Errorf("expected error rate 0, got %f", modelResult.ErrorRate)
+	}
+	if len(runs) != 3 {
+		t.Errorf("expected 3 runs, got %d", len(runs))
+	}
+
+	// Check latency calculations
+	if modelResult.LatencyAvgMs != 150 {
+		t.Errorf("expected avg latency 150, got %f", modelResult.LatencyAvgMs)
+	}
+
+	// Verify all runs have correct data
+	for _, run := range runs {
+		if run.Error != "" {
+			t.Errorf("unexpected error: %s", run.Error)
+		}
+		if run.PromptTokens != 100 {
+			t.Errorf("expected 100 prompt tokens, got %d", run.PromptTokens)
+		}
+	}
+}
+
+func TestBenchmarkModelMixedResults(t *testing.T) {
+	registry := NewProviderRegistry()
+	provider := &mockBenchmarkProvider{
+		responses: []*CompletionResponse{
+			{LatencyMs: 100, PromptTokens: 100, OutputTokens: 50, TotalTokens: 150, Cost: 0.003},
+			nil, // This will use error
+			{LatencyMs: 200, PromptTokens: 100, OutputTokens: 50, TotalTokens: 150, Cost: 0.003},
+		},
+		errors: []error{
+			nil,
+			fmt.Errorf("API error"),
+			nil,
+		},
+	}
+	registry.Register(provider)
+
+	runner := NewRunner(nil, registry)
+	modelResult, runs := runner.benchmarkModel(nil, "gpt-4o-mini", "test prompt", 3)
+
+	if modelResult.Errors != 1 {
+		t.Errorf("expected 1 error, got %d", modelResult.Errors)
+	}
+
+	expectedErrorRate := float64(1) / float64(3)
+	if modelResult.ErrorRate != expectedErrorRate {
+		t.Errorf("expected error rate %f, got %f", expectedErrorRate, modelResult.ErrorRate)
+	}
+
+	// Check that we have mix of success and failure
+	successCount := 0
+	errorCount := 0
+	for _, run := range runs {
+		if run.Error != "" {
+			errorCount++
+		} else {
+			successCount++
+		}
+	}
+
+	if successCount != 2 {
+		t.Errorf("expected 2 successes, got %d", successCount)
+	}
+	if errorCount != 1 {
+		t.Errorf("expected 1 error, got %d", errorCount)
+	}
+}
+
+func TestBenchmarkModelCostCalculation(t *testing.T) {
+	registry := NewProviderRegistry()
+	provider := &mockBenchmarkProvider{
+		responses: []*CompletionResponse{
+			{LatencyMs: 100, Cost: 0.01},
+			{LatencyMs: 200, Cost: 0.02},
+			{LatencyMs: 150, Cost: 0.03},
+		},
+	}
+	registry.Register(provider)
+
+	runner := NewRunner(nil, registry)
+	modelResult, _ := runner.benchmarkModel(nil, "gpt-4o", "test prompt", 3)
+
+	// Total cost should be 0.06
+	if modelResult.TotalCost != 0.06 {
+		t.Errorf("expected total cost 0.06, got %f", modelResult.TotalCost)
+	}
+
+	// Average cost per request should be 0.02
+	if modelResult.CostPerRequest != 0.02 {
+		t.Errorf("expected cost per request 0.02, got %f", modelResult.CostPerRequest)
+	}
+}
+
+func TestPercentileEdgeCases(t *testing.T) {
+	tests := []struct {
+		name   string
+		sorted []int64
+		p      int
+		want   int64
+	}{
+		{"p100", []int64{10, 20, 30, 40, 50}, 100, 50},
+		{"two elements p50", []int64{10, 20}, 50, 20},
+		{"three elements p50", []int64{10, 20, 30}, 50, 20},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := percentile(tt.sorted, tt.p)
+			if got != tt.want {
+				t.Errorf("percentile() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
