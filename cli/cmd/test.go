@@ -6,8 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
+	"github.com/fsnotify/fsnotify"
 	"github.com/promptsmith/cli/internal/benchmark"
 	"github.com/promptsmith/cli/internal/db"
 	"github.com/promptsmith/cli/internal/testing"
@@ -20,6 +22,7 @@ var (
 	testOutput  string
 	testLive    bool
 	testModel   string
+	testWatch   bool
 )
 
 var testCmd = &cobra.Command{
@@ -39,7 +42,8 @@ Examples:
   promptsmith test --filter "basic"          # Run tests matching filter
   promptsmith test --version 1.0.0           # Test specific prompt version
   promptsmith test --live                    # Run with real LLM
-  promptsmith test --live --model gpt-4o     # Use specific model`,
+  promptsmith test --live --model gpt-4o     # Use specific model
+  promptsmith test --watch                   # Re-run tests on file changes`,
 	RunE: runTest,
 }
 
@@ -49,20 +53,27 @@ func init() {
 	testCmd.Flags().StringVarP(&testOutput, "output", "o", "", "write results to file (JSON format)")
 	testCmd.Flags().BoolVar(&testLive, "live", false, "run tests against real LLMs (requires API keys)")
 	testCmd.Flags().StringVarP(&testModel, "model", "m", "gpt-4o-mini", "model to use for live testing")
+	testCmd.Flags().BoolVarP(&testWatch, "watch", "w", false, "watch for file changes and re-run tests")
 	rootCmd.AddCommand(testCmd)
 }
 
-func runTest(cmd *cobra.Command, args []string) error {
+type testRunContext struct {
+	projectRoot string
+	database    *db.DB
+	suiteFiles  []string
+	executor    testing.OutputExecutor
+}
+
+func setupTestContext(args []string) (*testRunContext, error) {
 	projectRoot, err := db.FindProjectRoot()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	database, err := db.Open(projectRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer database.Close()
 
 	// Find test suite files
 	var suiteFiles []string
@@ -74,16 +85,10 @@ func runTest(cmd *cobra.Command, args []string) error {
 		if _, err := os.Stat(testsDir); err == nil {
 			matches, err := filepath.Glob(filepath.Join(testsDir, "*.test.yaml"))
 			if err != nil {
-				return fmt.Errorf("failed to find test files: %w", err)
+				return nil, fmt.Errorf("failed to find test files: %w", err)
 			}
 			suiteFiles = matches
 		}
-	}
-
-	if len(suiteFiles) == 0 {
-		fmt.Println("No test suites found.")
-		fmt.Println("Create test files in tests/*.test.yaml or specify files directly.")
-		return nil
 	}
 
 	// Set up executor
@@ -107,23 +112,26 @@ func runTest(cmd *cobra.Command, args []string) error {
 		}
 
 		executor = testing.NewLLMExecutor(registry, testing.WithModel(testModel))
-		if !jsonOut {
-			fmt.Printf("Running tests with live LLM (%s)\n", testModel)
-		}
 	}
 
-	// Parse and run all suites
-	runner := testing.NewRunner(database, executor)
-	var allResults []*testing.SuiteResult
-	totalPassed, totalFailed, totalSkipped := 0, 0, 0
+	return &testRunContext{
+		projectRoot: projectRoot,
+		database:    database,
+		suiteFiles:  suiteFiles,
+		executor:    executor,
+	}, nil
+}
 
+func executeTests(ctx *testRunContext) (passed, failed, skipped int, results []*testing.SuiteResult) {
 	green := color.New(color.FgGreen).SprintFunc()
 	red := color.New(color.FgRed).SprintFunc()
 	yellow := color.New(color.FgYellow).SprintFunc()
 	cyan := color.New(color.FgCyan).SprintFunc()
 	dim := color.New(color.Faint).SprintFunc()
 
-	for _, file := range suiteFiles {
+	runner := testing.NewRunner(ctx.database, ctx.executor)
+
+	for _, file := range ctx.suiteFiles {
 		suite, err := testing.ParseSuiteFile(file)
 		if err != nil {
 			fmt.Printf("%s Error parsing %s: %v\n", red("✗"), file, err)
@@ -156,10 +164,10 @@ func runTest(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		allResults = append(allResults, result)
-		totalPassed += result.Passed
-		totalFailed += result.Failed
-		totalSkipped += result.Skipped
+		results = append(results, result)
+		passed += result.Passed
+		failed += result.Failed
+		skipped += result.Skipped
 
 		// Print results
 		if !jsonOut {
@@ -187,7 +195,17 @@ func runTest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Summary
+	return passed, failed, skipped, results
+}
+
+func printTestSummary(passed, failed, skipped int, results []*testing.SuiteResult) {
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+	yellow := color.New(color.FgYellow).SprintFunc()
+	dim := color.New(color.Faint).SprintFunc()
+
+	total := passed + failed + skipped
+
 	if jsonOut {
 		output := struct {
 			Suites  []*testing.SuiteResult `json:"suites"`
@@ -198,33 +216,33 @@ func runTest(cmd *cobra.Command, args []string) error {
 				Total   int `json:"total"`
 			} `json:"summary"`
 		}{
-			Suites: allResults,
+			Suites: results,
 		}
-		output.Summary.Passed = totalPassed
-		output.Summary.Failed = totalFailed
-		output.Summary.Skipped = totalSkipped
-		output.Summary.Total = totalPassed + totalFailed + totalSkipped
+		output.Summary.Passed = passed
+		output.Summary.Failed = failed
+		output.Summary.Skipped = skipped
+		output.Summary.Total = total
 
 		data, _ := json.MarshalIndent(output, "", "  ")
 
 		if testOutput != "" {
 			if err := os.WriteFile(testOutput, data, 0644); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
+				fmt.Printf("Failed to write output: %v\n", err)
+			} else {
+				fmt.Printf("Results written to %s\n", testOutput)
 			}
-			fmt.Printf("Results written to %s\n", testOutput)
 		} else {
 			fmt.Println(string(data))
 		}
 	} else {
-		total := totalPassed + totalFailed + totalSkipped
 		fmt.Printf("\n%s\n", strings.Repeat("─", 40))
-		if totalFailed == 0 {
-			fmt.Printf("%s %d passed", green("✓"), totalPassed)
+		if failed == 0 {
+			fmt.Printf("%s %d passed", green("✓"), passed)
 		} else {
-			fmt.Printf("%s %d passed, %s %d failed", green("✓"), totalPassed, red("✗"), totalFailed)
+			fmt.Printf("%s %d passed, %s %d failed", green("✓"), passed, red("✗"), failed)
 		}
-		if totalSkipped > 0 {
-			fmt.Printf(", %s %d skipped", yellow("○"), totalSkipped)
+		if skipped > 0 {
+			fmt.Printf(", %s %d skipped", yellow("○"), skipped)
 		}
 		fmt.Printf(" %s\n", dim(fmt.Sprintf("(%d total)", total)))
 
@@ -238,23 +256,116 @@ func runTest(cmd *cobra.Command, args []string) error {
 					Total   int `json:"total"`
 				} `json:"summary"`
 			}{
-				Suites: allResults,
+				Suites: results,
 			}
-			output.Summary.Passed = totalPassed
-			output.Summary.Failed = totalFailed
-			output.Summary.Skipped = totalSkipped
+			output.Summary.Passed = passed
+			output.Summary.Failed = failed
+			output.Summary.Skipped = skipped
 			output.Summary.Total = total
 
 			data, _ := json.MarshalIndent(output, "", "  ")
 			if err := os.WriteFile(testOutput, data, 0644); err != nil {
-				return fmt.Errorf("failed to write output: %w", err)
+				fmt.Printf("Failed to write output: %v\n", err)
+			} else {
+				fmt.Printf("Results written to %s\n", testOutput)
 			}
-			fmt.Printf("Results written to %s\n", testOutput)
 		}
 	}
+}
+
+func runTestWatch(ctx *testRunContext) error {
+	cyan := color.New(color.FgCyan).SprintFunc()
+	dim := color.New(color.Faint).SprintFunc()
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return fmt.Errorf("failed to create watcher: %w", err)
+	}
+	defer watcher.Close()
+
+	// Watch the tests directory
+	testsDir := filepath.Join(ctx.projectRoot, "tests")
+	if err := watcher.Add(testsDir); err != nil {
+		return fmt.Errorf("failed to watch tests directory: %w", err)
+	}
+
+	// Watch the prompts directory
+	promptsDir := filepath.Join(ctx.projectRoot, "prompts")
+	if err := watcher.Add(promptsDir); err != nil {
+		// Prompts dir might not exist, that's okay
+		_ = err
+	}
+
+	// Initial run
+	fmt.Printf("%s Watching for changes... %s\n", cyan("👁"), dim("(Ctrl+C to stop)"))
+	passed, failed, skipped, results := executeTests(ctx)
+	printTestSummary(passed, failed, skipped, results)
+
+	// Debounce timer to avoid multiple rapid triggers
+	var debounce <-chan time.Time
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return nil
+			}
+
+			// Only react to writes and creates
+			if event.Op&(fsnotify.Write|fsnotify.Create) != 0 {
+				// Check if it's a relevant file
+				ext := filepath.Ext(event.Name)
+				if ext == ".yaml" || ext == ".yml" || ext == ".prompt" {
+					// Debounce - wait 100ms before running
+					debounce = time.After(100 * time.Millisecond)
+				}
+			}
+
+		case <-debounce:
+			// Clear screen and re-run
+			fmt.Print("\033[H\033[2J")
+			fmt.Printf("%s File changed, re-running tests...\n", cyan("↻"))
+			passed, failed, skipped, results := executeTests(ctx)
+			printTestSummary(passed, failed, skipped, results)
+			fmt.Printf("\n%s Watching for changes... %s\n", cyan("👁"), dim("(Ctrl+C to stop)"))
+
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return nil
+			}
+			fmt.Printf("Watcher error: %v\n", err)
+		}
+	}
+}
+
+func runTest(cmd *cobra.Command, args []string) error {
+	ctx, err := setupTestContext(args)
+	if err != nil {
+		return err
+	}
+	defer ctx.database.Close()
+
+	if len(ctx.suiteFiles) == 0 {
+		fmt.Println("No test suites found.")
+		fmt.Println("Create test files in tests/*.test.yaml or specify files directly.")
+		return nil
+	}
+
+	if testLive && !jsonOut {
+		fmt.Printf("Running tests with live LLM (%s)\n", testModel)
+	}
+
+	// Watch mode
+	if testWatch {
+		return runTestWatch(ctx)
+	}
+
+	// Single run mode
+	passed, failed, skipped, results := executeTests(ctx)
+	printTestSummary(passed, failed, skipped, results)
 
 	// Exit with error code if tests failed
-	if totalFailed > 0 {
+	if failed > 0 {
 		os.Exit(1)
 	}
 
