@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/promptsmith/cli/internal/benchmark"
 	"github.com/promptsmith/cli/internal/db"
 	"github.com/promptsmith/cli/internal/testing"
 )
@@ -35,6 +37,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/project", s.corsMiddleware(s.handleProject))
 	s.mux.HandleFunc("/api/tests", s.corsMiddleware(s.handleTests))
 	s.mux.HandleFunc("/api/tests/", s.corsMiddleware(s.handleTestByName))
+	s.mux.HandleFunc("/api/benchmarks", s.corsMiddleware(s.handleBenchmarks))
+	s.mux.HandleFunc("/api/benchmarks/", s.corsMiddleware(s.handleBenchmarkByName))
 }
 
 func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -101,6 +105,15 @@ type TestSuiteResponse struct {
 	Prompt      string `json:"prompt"`
 	Description string `json:"description,omitempty"`
 	TestCount   int    `json:"test_count"`
+}
+
+type BenchmarkSuiteResponse struct {
+	Name        string   `json:"name"`
+	FilePath    string   `json:"file_path"`
+	Prompt      string   `json:"prompt"`
+	Description string   `json:"description,omitempty"`
+	Models      []string `json:"models"`
+	RunsPerModel int     `json:"runs_per_model"`
 }
 
 // Handlers
@@ -449,6 +462,145 @@ func (s *Server) runTest(w http.ResponseWriter, r *http.Request, testName string
 	// Run the test suite
 	runner := testing.NewRunner(s.db, nil) // Using mock executor
 	result, err := runner.Run(suite)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// Benchmark handlers
+
+func (s *Server) handleBenchmarks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	benchDir := filepath.Join(s.root, "benchmarks")
+	if _, err := os.Stat(benchDir); os.IsNotExist(err) {
+		writeJSON(w, http.StatusOK, []BenchmarkSuiteResponse{})
+		return
+	}
+
+	matches, err := filepath.Glob(filepath.Join(benchDir, "*.bench.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := make([]BenchmarkSuiteResponse, 0, len(matches))
+	for _, file := range matches {
+		suite, err := benchmark.ParseSuiteFile(file)
+		if err != nil {
+			continue // Skip invalid files
+		}
+
+		relPath, _ := filepath.Rel(s.root, file)
+		response = append(response, BenchmarkSuiteResponse{
+			Name:         suite.Name,
+			FilePath:     relPath,
+			Prompt:       suite.Prompt,
+			Description:  suite.Description,
+			Models:       suite.Models,
+			RunsPerModel: suite.RunsPerModel,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleBenchmarkByName(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/benchmarks/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusBadRequest, "benchmark name required")
+		return
+	}
+
+	benchName := parts[0]
+
+	// Check for /run endpoint
+	if len(parts) >= 2 && parts[1] == "run" {
+		s.runBenchmark(w, r, benchName)
+		return
+	}
+
+	// Get single benchmark suite info
+	s.getBenchmark(w, r, benchName)
+}
+
+func (s *Server) getBenchmark(w http.ResponseWriter, r *http.Request, benchName string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	benchDir := filepath.Join(s.root, "benchmarks")
+	matches, err := filepath.Glob(filepath.Join(benchDir, "*.bench.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	for _, file := range matches {
+		suite, err := benchmark.ParseSuiteFile(file)
+		if err != nil {
+			continue
+		}
+		if suite.Name == benchName {
+			writeJSON(w, http.StatusOK, suite)
+			return
+		}
+	}
+
+	writeError(w, http.StatusNotFound, fmt.Sprintf("benchmark suite '%s' not found", benchName))
+}
+
+func (s *Server) runBenchmark(w http.ResponseWriter, r *http.Request, benchName string) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	benchDir := filepath.Join(s.root, "benchmarks")
+	matches, err := filepath.Glob(filepath.Join(benchDir, "*.bench.yaml"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var suite *benchmark.Suite
+	for _, file := range matches {
+		bs, err := benchmark.ParseSuiteFile(file)
+		if err != nil {
+			continue
+		}
+		if bs.Name == benchName {
+			suite = bs
+			break
+		}
+	}
+
+	if suite == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("benchmark suite '%s' not found", benchName))
+		return
+	}
+
+	// Create provider registry
+	registry := benchmark.NewProviderRegistry()
+	if openai, err := benchmark.NewOpenAIProvider(); err == nil {
+		registry.Register(openai)
+	}
+	if anthropic, err := benchmark.NewAnthropicProvider(); err == nil {
+		registry.Register(anthropic)
+	}
+
+	// Run the benchmark suite
+	runner := benchmark.NewRunner(s.db, registry)
+	result, err := runner.Run(context.Background(), suite)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
