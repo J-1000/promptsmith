@@ -2629,3 +2629,188 @@ func TestGenerateCommandValidTypes(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// Config Command Integration Tests
+// ============================================================================
+
+func TestConfigCommandListAll(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Run config command with no args - lists all config
+	err := runConfig(&cobra.Command{}, []string{})
+	if err != nil {
+		t.Fatalf("runConfig (list all) failed: %v", err)
+	}
+}
+
+func TestConfigCommandGetValue(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Get a specific value
+	err := runConfig(&cobra.Command{}, []string{"project.name"})
+	if err != nil {
+		t.Fatalf("runConfig (get project.name) failed: %v", err)
+	}
+}
+
+func TestConfigCommandSetValue(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Set a value
+	err := runConfig(&cobra.Command{}, []string{"defaults.model", "claude-sonnet"})
+	if err != nil {
+		t.Fatalf("runConfig (set defaults.model) failed: %v", err)
+	}
+
+	// Verify it was set
+	config, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	if config.Defaults.Model != "claude-sonnet" {
+		t.Errorf("expected defaults.model 'claude-sonnet', got %q", config.Defaults.Model)
+	}
+}
+
+func TestConfigCommandSetTemperature(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Set temperature
+	err := runConfig(&cobra.Command{}, []string{"defaults.temperature", "0.5"})
+	if err != nil {
+		t.Fatalf("runConfig (set temperature) failed: %v", err)
+	}
+
+	// Verify it was set
+	config, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	if config.Defaults.Temperature != 0.5 {
+		t.Errorf("expected temperature 0.5, got %f", config.Defaults.Temperature)
+	}
+}
+
+func TestConfigCommandSetProjectName(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Set project name
+	err := runConfig(&cobra.Command{}, []string{"project.name", "new-project-name"})
+	if err != nil {
+		t.Fatalf("runConfig (set project.name) failed: %v", err)
+	}
+
+	// Verify it was set
+	config, err := loadConfig(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to load config: %v", err)
+	}
+	if config.Project.Name != "new-project-name" {
+		t.Errorf("expected project.name 'new-project-name', got %q", config.Project.Name)
+	}
+}
+
+func TestConfigCommandSetDirs(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	tests := []struct {
+		key   string
+		value string
+		check func(*Config) string
+	}{
+		{"prompts_dir", "./custom-prompts", func(c *Config) string { return c.PromptsDir }},
+		{"tests_dir", "./custom-tests", func(c *Config) string { return c.TestsDir }},
+		{"benchmarks_dir", "./custom-benchmarks", func(c *Config) string { return c.BenchmarksDir }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			err := runConfig(&cobra.Command{}, []string{tt.key, tt.value})
+			if err != nil {
+				t.Fatalf("runConfig (set %s) failed: %v", tt.key, err)
+			}
+
+			config, err := loadConfig(tmpDir)
+			if err != nil {
+				t.Fatalf("failed to load config: %v", err)
+			}
+			if tt.check(config) != tt.value {
+				t.Errorf("expected %s %q, got %q", tt.key, tt.value, tt.check(config))
+			}
+		})
+	}
+}
+
+func TestConfigCommandGetUnknownKey(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to get an unknown key
+	err := runConfig(&cobra.Command{}, []string{"unknown.key"})
+	if err == nil {
+		t.Error("expected error for unknown config key")
+	}
+	if !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("expected 'unknown' in error, got: %v", err)
+	}
+}
+
+func TestConfigCommandSetUnknownKey(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to set an unknown key
+	err := runConfig(&cobra.Command{}, []string{"unknown.key", "value"})
+	if err == nil {
+		t.Error("expected error for unknown config key")
+	}
+	if !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("expected 'unknown' in error, got: %v", err)
+	}
+}
+
+func TestConfigCommandSetReadOnlyKey(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to set version (read-only)
+	err := runConfig(&cobra.Command{}, []string{"version", "2"})
+	if err == nil {
+		t.Error("expected error when setting read-only version")
+	}
+
+	// Try to set project.id (read-only)
+	err = runConfig(&cobra.Command{}, []string{"project.id", "new-id"})
+	if err == nil {
+		t.Error("expected error when setting read-only project.id")
+	}
+}
+
+func TestConfigCommandInvalidTemperature(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	// Try to set invalid temperature
+	err := runConfig(&cobra.Command{}, []string{"defaults.temperature", "invalid"})
+	if err == nil {
+		t.Error("expected error for invalid temperature")
+	}
+
+	// Try to set temperature out of range
+	err = runConfig(&cobra.Command{}, []string{"defaults.temperature", "3.0"})
+	if err == nil {
+		t.Error("expected error for temperature > 2")
+	}
+
+	err = runConfig(&cobra.Command{}, []string{"defaults.temperature", "-1"})
+	if err == nil {
+		t.Error("expected error for negative temperature")
+	}
+}
