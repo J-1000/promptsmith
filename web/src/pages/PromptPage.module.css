@@ -306,3 +306,26 @@
   color: var(--accent-primary);
   font-size: 14px;
 }
+
+.emptyHistory {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 48px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.hint code {
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}

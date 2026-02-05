@@ -298,32 +298,41 @@ export function PromptPage() {
 
         {view === 'history' && (
           <div className={styles.history}>
-            <p className={styles.historyHint}>
-              Select two versions to compare
-            </p>
-            {versions.map((v) => (
-              <div
-                key={v.version}
-                className={`${styles.versionRow} ${selectedVersions.includes(v.version) ? styles.versionSelected : ''}`}
-                onClick={() => toggleVersion(v.version)}
-              >
-                <div className={styles.versionCheck}>
-                  {selectedVersions.includes(v.version) && (
-                    <span className={styles.checkMark}>&#10003;</span>
-                  )}
-                </div>
-                <div className={styles.versionInfo}>
-                  <div className={styles.versionHeader}>
-                    <span className={styles.versionNumber}>v{v.version}</span>
-                    {v.tags.map((tag) => (
-                      <span key={tag} className={styles.tag}>{tag}</span>
-                    ))}
-                  </div>
-                  <p className={styles.versionMessage}>{v.message}</p>
-                  <span className={styles.versionDate}>{v.date}</span>
-                </div>
+            {versions.length === 0 ? (
+              <div className={styles.emptyHistory}>
+                <p>No versions yet.</p>
+                <p className={styles.hint}>Commit changes with: <code>promptsmith commit -m "message"</code></p>
               </div>
-            ))}
+            ) : (
+              <>
+                <p className={styles.historyHint}>
+                  Select two versions to compare
+                </p>
+                {versions.map((v) => (
+                  <div
+                    key={v.version}
+                    className={`${styles.versionRow} ${selectedVersions.includes(v.version) ? styles.versionSelected : ''}`}
+                    onClick={() => toggleVersion(v.version)}
+                  >
+                    <div className={styles.versionCheck}>
+                      {selectedVersions.includes(v.version) && (
+                        <span className={styles.checkMark}>&#10003;</span>
+                      )}
+                    </div>
+                    <div className={styles.versionInfo}>
+                      <div className={styles.versionHeader}>
+                        <span className={styles.versionNumber}>v{v.version}</span>
+                        {v.tags.map((tag) => (
+                          <span key={tag} className={styles.tag}>{tag}</span>
+                        ))}
+                      </div>
+                      <p className={styles.versionMessage}>{v.message}</p>
+                      <span className={styles.versionDate}>{v.date}</span>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
 
