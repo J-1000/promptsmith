@@ -1912,3 +1912,142 @@ func TestTagCommandPromptNotFound(t *testing.T) {
 		t.Error("expected error for non-existent prompt")
 	}
 }
+
+// ============================================================================
+// Checkout Command Integration Tests
+// ============================================================================
+
+func TestCheckoutCommand(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "checkout.prompt")
+
+	// Create multiple versions
+	os.WriteFile(promptPath, []byte("Version 1 content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/checkout.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("Version 2 content"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Checkout first version
+	err := runCheckout(&cobra.Command{}, []string{"checkout", "1.0.0"})
+	if err != nil {
+		t.Fatalf("runCheckout failed: %v", err)
+	}
+
+	// Verify file content was restored
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if string(content) != "Version 1 content" {
+		t.Errorf("expected 'Version 1 content', got %q", string(content))
+	}
+}
+
+func TestCheckoutCommandByTag(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "checkoutag.prompt")
+
+	// Create versions
+	os.WriteFile(promptPath, []byte("Production content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/checkoutag.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Tag as prod
+	tagList = false
+	tagDelete = false
+	runTag(&cobra.Command{}, []string{"checkoutag", "prod"})
+
+	// Create another version
+	os.WriteFile(promptPath, []byte("Development content"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Checkout by tag
+	err := runCheckout(&cobra.Command{}, []string{"checkoutag", "prod"})
+	if err != nil {
+		t.Fatalf("runCheckout failed: %v", err)
+	}
+
+	// Verify file content
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if string(content) != "Production content" {
+		t.Errorf("expected 'Production content', got %q", string(content))
+	}
+}
+
+func TestCheckoutCommandHeadNotation(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "checkhead.prompt")
+
+	// Create multiple versions
+	os.WriteFile(promptPath, []byte("V1"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/checkhead.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V2"), 0644)
+	commitMessage = "V2"
+	runCommit(&cobra.Command{}, []string{})
+
+	os.WriteFile(promptPath, []byte("V3"), 0644)
+	commitMessage = "V3"
+	runCommit(&cobra.Command{}, []string{})
+
+	// Checkout HEAD~2 (first version)
+	err := runCheckout(&cobra.Command{}, []string{"checkhead", "HEAD~2"})
+	if err != nil {
+		t.Fatalf("runCheckout failed: %v", err)
+	}
+
+	// Verify file content
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if string(content) != "V1" {
+		t.Errorf("expected 'V1', got %q", string(content))
+	}
+}
+
+func TestCheckoutCommandPromptNotFound(t *testing.T) {
+	_, cleanup := initTestProject(t)
+	defer cleanup()
+
+	err := runCheckout(&cobra.Command{}, []string{"nonexistent", "1.0.0"})
+	if err == nil {
+		t.Error("expected error for non-existent prompt")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected 'not found' error, got: %v", err)
+	}
+}
+
+func TestCheckoutCommandVersionNotFound(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	promptPath := filepath.Join(tmpDir, "prompts", "checkver.prompt")
+	os.WriteFile(promptPath, []byte("Content"), 0644)
+	runAdd(&cobra.Command{}, []string{"prompts/checkver.prompt"})
+	commitMessage = "V1"
+	runCommit(&cobra.Command{}, []string{})
+
+	err := runCheckout(&cobra.Command{}, []string{"checkver", "9.9.9"})
+	if err == nil {
+		t.Error("expected error for non-existent version")
+	}
+}
