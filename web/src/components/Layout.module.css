@@ -47,12 +47,24 @@
   color: var(--text-secondary);
   font-size: 14px;
   font-weight: 500;
-  transition: color 0.15s;
+  padding: 6px 12px;
+  border-radius: 6px;
+  transition: all 0.15s;
 }
 
 .navLink:hover {
   color: var(--text-primary);
   text-decoration: none;
+  background: var(--bg-tertiary);
+}
+
+.navLinkActive {
+  color: var(--accent-primary);
+  background: var(--accent-glow);
+}
+
+.navLinkActive:hover {
+  color: var(--accent-primary);
 }
 
 .main {
