@@ -1,14 +1,19 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { createTwoFilesPatch } from 'diff'
 import { DiffViewer } from '../components/DiffViewer'
 import { TestResults, SuiteResult } from '../components/TestResults'
 import { BenchmarkResults, BenchmarkResult } from '../components/BenchmarkResults'
 import { GeneratePanel, GenerateResult, GenerationType } from '../components/GeneratePanel'
+import { ConfirmDialog } from '../components/ConfirmDialog'
+import { Toast } from '../components/Toast'
 import {
   getPrompt,
   getPromptVersions,
   getPromptDiff,
+  deletePrompt,
+  createTag,
+  deleteTag,
   runTest,
   runBenchmark,
   generateVariations,
@@ -18,6 +23,7 @@ import {
 import styles from './PromptPage.module.css'
 
 interface VersionDisplay {
+  id: string
   version: string
   message: string
   date: string
@@ -27,6 +33,7 @@ interface VersionDisplay {
 
 export function PromptPage() {
   const { name } = useParams<{ name: string }>()
+  const navigate = useNavigate()
   const [prompt, setPrompt] = useState<Prompt | null>(null)
   const [versions, setVersions] = useState<VersionDisplay[]>([])
   const [currentContent, setCurrentContent] = useState<string>('')
@@ -43,6 +50,10 @@ export function PromptPage() {
   const [generateResults, setGenerateResults] = useState<GenerateResult | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [newTagVersion, setNewTagVersion] = useState<string | null>(null)
+  const [newTagName, setNewTagName] = useState('')
 
   const copyToClipboard = async () => {
     if (!currentContent) return
@@ -52,6 +63,58 @@ export function PromptPage() {
       setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!name) return
+    try {
+      await deletePrompt(name)
+      navigate('/')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete'
+      setToast({ message: msg, type: 'error' })
+      setShowDeleteConfirm(false)
+    }
+  }
+
+  const refreshVersions = async () => {
+    if (!name) return
+    const versionsData = await getPromptVersions(name)
+    const versionDisplays = versionsData.map((v: Version) => ({
+      version: v.version,
+      message: v.commit_message,
+      date: new Date(v.created_at).toLocaleString(),
+      tags: v.tags || [],
+      content: v.content,
+      id: v.id,
+    }))
+    setVersions(versionDisplays)
+  }
+
+  const handleAddTag = async (versionId: string) => {
+    if (!name || !newTagName.trim()) return
+    try {
+      await createTag(name, newTagName.trim(), versionId)
+      setNewTagVersion(null)
+      setNewTagName('')
+      await refreshVersions()
+      setToast({ message: `Tag "${newTagName.trim()}" added`, type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add tag'
+      setToast({ message: msg, type: 'error' })
+    }
+  }
+
+  const handleDeleteTag = async (tagName: string) => {
+    if (!name) return
+    try {
+      await deleteTag(name, tagName)
+      await refreshVersions()
+      setToast({ message: `Tag "${tagName}" removed`, type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete tag'
+      setToast({ message: msg, type: 'error' })
     }
   }
 
@@ -70,6 +133,7 @@ export function PromptPage() {
       .then(([promptData, versionsData]) => {
         setPrompt(promptData)
         const versionDisplays = versionsData.map((v: Version) => ({
+          id: v.id,
           version: v.version,
           message: v.commit_message,
           date: new Date(v.created_at).toLocaleString(),
@@ -247,6 +311,7 @@ export function PromptPage() {
             <span key={tag} className={styles.headerTag}>{tag}</span>
           ))}
           <Link to={`/prompt/${name}/edit`} className={styles.editButton}>Edit</Link>
+          <button className={styles.deleteButton} onClick={() => setShowDeleteConfirm(true)}>Delete</button>
         </div>
         <div className={styles.tabs}>
           <button
@@ -352,8 +417,40 @@ export function PromptPage() {
                       <div className={styles.versionHeader}>
                         <span className={styles.versionNumber}>v{v.version}</span>
                         {v.tags.map((tag) => (
-                          <span key={tag} className={styles.tag}>{tag}</span>
+                          <span key={tag} className={styles.tag}>
+                            {tag}
+                            <button
+                              className={styles.tagDelete}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteTag(tag) }}
+                              aria-label={`Remove tag ${tag}`}
+                            >
+                              &times;
+                            </button>
+                          </span>
                         ))}
+                        {newTagVersion === v.id ? (
+                          <span className={styles.tagInput} onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              className={styles.tagInputField}
+                              value={newTagName}
+                              onChange={(e) => setNewTagName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleAddTag(v.id)
+                                if (e.key === 'Escape') { setNewTagVersion(null); setNewTagName('') }
+                              }}
+                              placeholder="tag name"
+                              autoFocus
+                            />
+                          </span>
+                        ) : (
+                          <button
+                            className={styles.addTagButton}
+                            onClick={(e) => { e.stopPropagation(); setNewTagVersion(v.id); setNewTagName('') }}
+                          >
+                            + tag
+                          </button>
+                        )}
                       </div>
                       <p className={styles.versionMessage}>{v.message}</p>
                       <span className={styles.versionDate}>{v.date}</span>
@@ -397,6 +494,21 @@ export function PromptPage() {
           />
         )}
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          title="Delete Prompt"
+          message={`Are you sure you want to delete "${name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          variant="danger"
+          onConfirm={handleDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
+      )}
     </div>
   )
 }

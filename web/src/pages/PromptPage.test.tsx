@@ -9,12 +9,15 @@ vi.mock('../api', () => ({
   getPrompt: vi.fn(),
   getPromptVersions: vi.fn(),
   getPromptDiff: vi.fn(),
+  deletePrompt: vi.fn(),
+  createTag: vi.fn(),
+  deleteTag: vi.fn(),
   runTest: vi.fn(),
   runBenchmark: vi.fn(),
   generateVariations: vi.fn(),
 }))
 
-import { getPrompt, getPromptVersions, getPromptDiff } from '../api'
+import { getPrompt, getPromptVersions, getPromptDiff, deletePrompt } from '../api'
 
 const mockPrompt = {
   id: '1',
@@ -178,5 +181,72 @@ describe('PromptPage', () => {
     await user.click(screen.getByRole('button', { name: /generate/i }))
 
     expect(screen.getByText('Generate variations of your prompt using AI')).toBeInTheDocument()
+  })
+
+  it('shows delete button', async () => {
+    renderWithRouter('/prompt/greeting')
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument()
+    })
+  })
+
+  it('shows confirm dialog on delete click', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('Delete'))
+    expect(screen.getByText('Delete Prompt')).toBeInTheDocument()
+    expect(screen.getByText(/are you sure/i)).toBeInTheDocument()
+  })
+
+  it('calls deletePrompt on confirm', async () => {
+    const user = userEvent.setup()
+    vi.mocked(deletePrompt).mockResolvedValue(undefined)
+    renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('Delete'))
+    // Click confirm in dialog — the confirm button has label "Delete"
+    const dialogButtons = screen.getAllByText('Delete')
+    await user.click(dialogButtons[dialogButtons.length - 1])
+
+    await waitFor(() => {
+      expect(deletePrompt).toHaveBeenCalledWith('greeting')
+    })
+  })
+
+  it('shows add tag button in history view', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /history/i }))
+
+    const addTagButtons = screen.getAllByText('+ tag')
+    expect(addTagButtons.length).toBeGreaterThan(0)
+  })
+
+  it('shows remove tag buttons in history view', async () => {
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /history/i }))
+
+    expect(screen.getByLabelText('Remove tag prod')).toBeInTheDocument()
+    expect(screen.getByLabelText('Remove tag staging')).toBeInTheDocument()
   })
 })
