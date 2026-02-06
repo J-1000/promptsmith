@@ -319,6 +319,41 @@ Web UI routes:
   /settings             Settings (project, providers, sync)
 
 
+Phase 7: CRUD Completion + Polish [COMPLETE]
+---------------------------------------------
+  [x] DeletePrompt DB layer with cascade delete (tags, versions, prompt)
+  [x] POST /api/prompts — create prompt endpoint (validation, file write, initial version)
+  [x] DELETE /api/prompts/:name — delete prompt endpoint (204, safety: no file delete)
+  [x] POST /api/prompts/:name/tags — create tag endpoint
+  [x] DELETE /api/prompts/:name/tags/:tagName — delete tag endpoint
+  [x] API client: createPrompt(), deletePrompt(), createTag(), deleteTag()
+  [x] Toast notification component (auto-dismiss 3s, success/error/info variants)
+  [x] ConfirmDialog component (modal overlay, danger variant)
+  [x] "New Prompt" button + modal on HomePage
+  [x] Delete prompt on PromptPage with confirmation
+  [x] Tag management on PromptPage (add/remove tags per version)
+  [x] MIT LICENSE
+  [x] CONTRIBUTING.md
+  [x] Go tests for new endpoints (6 new tests)
+  [x] Web tests for new components and features
+
+New files:
+  web/src/components/Toast.tsx              Toast notification
+  web/src/components/Toast.module.css
+  web/src/components/Toast.test.tsx
+  web/src/components/ConfirmDialog.tsx      Confirmation dialog
+  web/src/components/ConfirmDialog.module.css
+  web/src/components/ConfirmDialog.test.tsx
+  LICENSE                                   MIT license
+  CONTRIBUTING.md                           Contributing guide
+
+API endpoints added:
+  - POST   /api/prompts              Create a new prompt
+  - DELETE /api/prompts/:name        Delete a prompt
+  - POST   /api/prompts/:name/tags   Create a tag
+  - DELETE /api/prompts/:name/tags/:tagName  Delete a tag
+
+
 Build & Test
 ------------
   cd cli
