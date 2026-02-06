@@ -229,6 +229,7 @@ API Server:
   - GET  /api/prompts          List prompts
   - GET  /api/prompts/:id      Get prompt
   - GET  /api/prompts/:id/versions  List versions
+  - POST /api/prompts/:id/versions  Create new version
   - GET  /api/prompts/:id/diff Get diff
   - GET  /api/tests            List test suites
   - GET  /api/tests/:name      Get test suite
@@ -236,6 +237,7 @@ API Server:
   - GET  /api/benchmarks       List benchmarks
   - GET  /api/benchmarks/:name Get benchmark
   - POST /api/benchmarks/:name/run Run benchmark
+  - POST /api/generate         Generate prompt variations
 
 
 Phase 5: Cloud Sync & Collaboration [COMPLETE]

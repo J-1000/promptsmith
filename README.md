@@ -292,14 +292,16 @@ npm run dev        # Runs on http://localhost:8081
 ```
 
 Features:
-- Prompt list with version badges and search/filter
-- Version history with commit messages and tags
-- Version selector to view older prompt versions
-- Unified diff viewer for comparing versions
-- Copy to clipboard for prompt content
-- Test results dashboard with pass/fail indicators
-- Benchmark results with model comparison table
-- AI-powered prompt variation generator
+- **Dashboard** — Project stats (prompts, test suites, test cases, benchmarks)
+- **Prompt list** — Version badges, search/filter, prompt cards
+- **Prompt detail** — Tabbed view: content, history, diff, tests, benchmarks, generate
+- **Prompt editor** — Edit prompts in-browser with live variable extraction, token counter, and save as new version
+- **Version history** — Commit messages, tags, side-by-side version comparison
+- **Diff viewer** — Unified diff with syntax highlighting
+- **Tests page** — Browse all test suites, run tests, view pass/fail results
+- **Benchmarks page** — Browse benchmarks, model tags, run and compare results
+- **Settings** — Project info, LLM provider config, sync settings
+- **AI generation** — Generate prompt variations, compress, expand, rephrase
 
 ### API Server
 
@@ -315,6 +317,7 @@ promptsmith serve --port 3000  # Custom port
 - `GET  /api/prompts` — List all prompts
 - `GET  /api/prompts/:name` — Get prompt details
 - `GET  /api/prompts/:name/versions` — List versions
+- `POST /api/prompts/:name/versions` — Create new version
 - `GET  /api/prompts/:name/diff?v1=X&v2=Y` — Version diff
 - `GET  /api/tests` — List test suites
 - `GET  /api/tests/:name` — Get test suite
@@ -380,6 +383,7 @@ promptsmith config sync.team my-team
 - [x] **Phase 3**: Testing framework with 15+ assertion types
 - [x] **Phase 4**: Multi-model benchmarking, AI generation, live testing
 - [x] **Phase 5**: Cloud sync, collaboration
+- [x] **Phase 6**: Full web UI — editor, tests, benchmarks, settings, dashboard
 
 ## License
 
