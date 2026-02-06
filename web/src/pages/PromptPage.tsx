@@ -246,6 +246,7 @@ export function PromptPage() {
           {versions.length > 0 && versions[0].tags.map((tag) => (
             <span key={tag} className={styles.headerTag}>{tag}</span>
           ))}
+          <Link to={`/prompt/${name}/edit`} className={styles.editButton}>Edit</Link>
         </div>
         <div className={styles.tabs}>
           <button

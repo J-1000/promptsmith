@@ -132,6 +132,17 @@ export async function getPromptDiff(
   return fetchApi(`/api/prompts/${name}/diff?v1=${v1}&v2=${v2}`);
 }
 
+export async function createVersion(
+  name: string,
+  content: string,
+  commitMessage: string
+): Promise<Version> {
+  return fetchApi<Version>(`/api/prompts/${name}/versions`, {
+    method: 'POST',
+    body: JSON.stringify({ content, commit_message: commitMessage }),
+  });
+}
+
 // Tests
 export async function listTests(): Promise<TestSuite[]> {
   return fetchApi<TestSuite[]>('/api/tests');
