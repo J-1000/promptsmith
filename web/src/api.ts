@@ -143,6 +143,46 @@ export async function createVersion(
   });
 }
 
+export async function createPrompt(
+  name: string,
+  description: string,
+  content?: string
+): Promise<Prompt> {
+  return fetchApi<Prompt>('/api/prompts', {
+    method: 'POST',
+    body: JSON.stringify({ name, description, content }),
+  });
+}
+
+export async function deletePrompt(name: string): Promise<void> {
+  await fetch(`${API_BASE}/api/prompts/${name}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  });
+}
+
+export async function createTag(
+  promptName: string,
+  tagName: string,
+  versionId: string
+): Promise<{ id: string; name: string; version_id: string }> {
+  return fetchApi(`/api/prompts/${promptName}/tags`, {
+    method: 'POST',
+    body: JSON.stringify({ name: tagName, version_id: versionId }),
+  });
+}
+
+export async function deleteTag(promptName: string, tagName: string): Promise<void> {
+  await fetch(`${API_BASE}/api/prompts/${promptName}/tags/${tagName}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  });
+}
+
 // Tests
 export async function listTests(): Promise<TestSuite[]> {
   return fetchApi<TestSuite[]>('/api/tests');
