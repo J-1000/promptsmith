@@ -13,14 +13,24 @@ describe('Layout', () => {
     expect(screen.getByText('PromptSmith')).toBeInTheDocument()
   })
 
-  it('renders navigation link to Prompts', () => {
+  it('renders navigation links', () => {
     renderWithRouter(<Layout />)
     expect(screen.getByRole('link', { name: 'Prompts' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Tests' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Benchmarks' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Settings' })).toBeInTheDocument()
   })
 
   it('logo links to home page', () => {
     renderWithRouter(<Layout />)
     const logoLink = screen.getByRole('link', { name: /promptsmith/i })
     expect(logoLink).toHaveAttribute('href', '/')
+  })
+
+  it('nav links point to correct routes', () => {
+    renderWithRouter(<Layout />)
+    expect(screen.getByRole('link', { name: 'Tests' })).toHaveAttribute('href', '/tests')
+    expect(screen.getByRole('link', { name: 'Benchmarks' })).toHaveAttribute('href', '/benchmarks')
+    expect(screen.getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings')
   })
 })
