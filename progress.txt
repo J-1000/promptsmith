@@ -1,0 +1,353 @@
+PromptSmith Development Progress
+================================
+
+Phase 1: Foundation — CLI Only [COMPLETE]
+-----------------------------------------
+
+Completed:
+  [x] CLI scaffolding in Go (cobra framework)
+  [x] Local SQLite database schema
+  [x] Core commands: init, add, commit, log
+  [x] Prompt file parsing (YAML frontmatter + Mustache)
+  [x] Pre-commit secret scanning with warnings
+
+Files created:
+  cli/
+  ├── main.go                     # Entry point
+  ├── go.mod                      # Go module
+  ├── go.sum                      # Dependencies
+  ├── cmd/
+  │   ├── root.go                 # Root command, flags
+  │   ├── init.go                 # promptsmith init
+  │   ├── add.go                  # promptsmith add <file>
+  │   ├── commit.go               # promptsmith commit -m "msg"
+  │   ├── log.go                  # promptsmith log
+  │   ├── diff.go                 # promptsmith diff (Phase 2)
+  │   ├── tag.go                  # promptsmith tag (Phase 2)
+  │   ├── checkout.go             # promptsmith checkout (Phase 2)
+  │   ├── test.go                 # promptsmith test (Phase 3)
+  │   ├── benchmark.go            # promptsmith benchmark (Phase 4)
+  │   ├── generate.go             # promptsmith generate (Phase 4)
+  │   ├── serve.go                # promptsmith serve (Phase 4)
+  │   ├── list.go                 # promptsmith list
+  │   ├── show.go                 # promptsmith show
+  │   ├── remove.go               # promptsmith remove
+  │   ├── status.go               # promptsmith status
+  │   ├── config.go               # promptsmith config
+  │   └── cmd_test.go             # Command tests
+  └── internal/
+      ├── db/
+      │   ├── db.go               # SQLite database layer
+      │   └── db_test.go          # Database tests
+      ├── prompt/
+      │   ├── parser.go           # YAML frontmatter + Mustache parsing
+      │   └── parser_test.go      # Parser tests
+      ├── scanner/
+      │   ├── secrets.go          # Secret/credential detection
+      │   └── secrets_test.go     # Scanner tests
+      ├── testing/
+      │   ├── suite.go            # Test suite parser
+      │   ├── suite_test.go       # Parser tests
+      │   ├── assertions.go       # Assertion evaluator
+      │   ├── assertions_test.go  # Assertion tests
+      │   ├── runner.go           # Test execution engine
+      │   ├── runner_test.go      # Runner tests
+      │   ├── executor.go         # LLM execution
+      │   └── executor_test.go    # Executor tests
+      ├── benchmark/
+      │   ├── suite.go            # Benchmark suite parser
+      │   ├── suite_test.go       # Suite tests
+      │   ├── runner.go           # Benchmark runner
+      │   ├── runner_test.go      # Runner tests
+      │   ├── provider.go         # Provider interface
+      │   ├── provider_test.go    # Provider tests
+      │   ├── openai.go           # OpenAI provider
+      │   ├── openai_test.go      # OpenAI tests
+      │   ├── anthropic.go        # Anthropic provider
+      │   └── anthropic_test.go   # Anthropic tests
+      ├── generator/
+      │   ├── generator.go        # Prompt generation
+      │   └── generator_test.go   # Generator tests
+      └── api/
+          ├── server.go           # REST API server
+          └── server_test.go      # Server tests
+
+Commands implemented:
+  promptsmith init [name]         Initialize project, create .promptsmith/
+  promptsmith add <file>          Track a prompt file
+  promptsmith commit -m "msg"     Create new version for changed prompts
+  promptsmith log [-p name]       Show version history
+  promptsmith diff <prompt> [v1] [v2]   Compare versions (unified diff, HEAD notation)
+  promptsmith tag <prompt> <name> [ver] Create/list/delete version tags
+  promptsmith checkout <prompt> <ref>   Switch working file to version or tag
+  promptsmith test [files...]     Run test suites
+  promptsmith benchmark <prompt>  Run benchmarks
+  promptsmith generate <type>     Generate prompt variations
+  promptsmith serve               Start REST API server
+  promptsmith list                List all prompts
+  promptsmith show <prompt>       Show prompt details
+  promptsmith remove <prompt>     Remove prompt from tracking
+  promptsmith status              Show uncommitted changes
+  promptsmith config [key] [val]  View/modify configuration
+
+Database schema (SQLite):
+  - projects: id, name, timestamps
+  - prompts: id, project_id, name, description, file_path
+  - prompt_versions: id, prompt_id, version (semver), content, variables, metadata, parent_version_id, commit_message
+  - tags: id, prompt_id, version_id, name
+  - test_suites, test_runs, benchmarks, benchmark_runs (for Phase 3-4)
+
+Secret scanning detects:
+  - AWS keys, GitHub/GitLab tokens
+  - OpenAI, Anthropic, Google API keys
+  - Slack, Stripe tokens
+  - Private keys, database URLs
+  - Generic secrets (api_key=, password=, etc.)
+
+
+Phase 2: Version Control [COMPLETE]
+-----------------------------------
+  [x] Diff algorithm (CLI output)
+  [x] Tags and environment management
+  [x] CLI commands: diff, tag, checkout
+  [x] Basic web UI scaffolding (Vite + React)
+  [x] Full versioning with branching
+
+Web UI files:
+  web/
+  ├── package.json              # Vite + React + TypeScript
+  ├── vite.config.ts            # Includes Vitest config
+  ├── tsconfig.json
+  ├── playwright.config.ts      # E2E test config
+  ├── index.html
+  ├── public/anvil.svg          # Logo icon
+  ├── scripts/screenshot.js     # UI testing helper
+  ├── e2e/                      # Playwright E2E tests
+  │   ├── navigation.spec.ts    # Navigation tests
+  │   └── prompt-page.spec.ts   # Prompt page tests
+  └── src/
+      ├── main.tsx              # Entry point
+      ├── App.tsx               # Routing setup
+      ├── theme.ts              # Color/font tokens
+      ├── index.css             # Global styles (dark theme)
+      ├── api.ts                # API client
+      ├── test/setup.ts         # Vitest setup
+      ├── components/
+      │   ├── Layout.tsx        # Header + nav shell
+      │   ├── Layout.test.tsx   # Layout tests
+      │   ├── DiffViewer.tsx    # Unified diff display
+      │   ├── DiffViewer.test.tsx # Diff tests
+      │   ├── TestResults.tsx   # Test results display
+      │   ├── TestResults.test.tsx # TestResults tests
+      │   ├── BenchmarkResults.tsx # Benchmark visualization
+      │   ├── BenchmarkResults.test.tsx # Benchmark tests
+      │   ├── GeneratePanel.tsx # Prompt generation UI
+      │   └── GeneratePanel.test.tsx # Generate tests
+      └── pages/
+          ├── HomePage.tsx      # Prompt list cards
+          ├── HomePage.test.tsx # Home page tests
+          ├── PromptPage.tsx    # Detail w/ tabs (content/history/diff/tests)
+          └── PromptPage.test.tsx # Prompt page tests
+
+Run web UI:
+  cd web
+  npm install
+  npm run dev                   # http://localhost:8081
+
+Web UI tests:
+  cd web
+  npm run test:run              # Vitest unit tests
+  npm run test:e2e              # Playwright E2E tests
+
+
+Phase 3: Testing [COMPLETE]
+---------------------------
+  [x] Test suite definition format (YAML)
+  [x] Assertion types implementation (15 types)
+  [x] Test runner (CLI)
+  [x] Test runner (web UI)
+  [x] CI integration (GitHub Actions)
+
+Commands added:
+  promptsmith test [files...]     Run test suites
+    --filter, -f <pattern>        Run tests matching pattern
+    --version, -v <ver>           Test specific prompt version
+    --output, -o <file>           Write JSON results to file
+    --json                        Output as JSON
+
+Test suite format (tests/*.test.yaml):
+  name: suite-name
+  prompt: prompt-name
+  version: "1.0.0"              # Optional: pin version
+  tests:
+    - name: test-name
+      inputs:
+        variable: value
+      assertions:
+        - type: contains
+          value: "expected"
+
+Assertion types:
+  - contains, not_contains      # String content
+  - equals, matches             # Exact match, regex
+  - starts_with, ends_with      # Prefix/suffix
+  - min_length, max_length      # Character count
+  - not_empty                   # Non-empty output
+  - json_valid, json_path       # JSON validation
+  - line_count, min_lines, max_lines
+  - word_count
+  - sentiment, language         # LLM-based (Phase 4)
+
+CI/CD:
+  .github/workflows/ci.yml      # GitHub Actions workflow
+  - Go CLI: build, test with coverage
+  - Web: typecheck, unit tests, E2E tests
+
+
+Phase 4: LLM Features [COMPLETE]
+--------------------------------
+  [x] Multi-provider integration (OpenAI, Anthropic)
+  [x] Variation generation
+  [x] Benchmark execution
+  [x] Results visualization (web UI)
+  [x] REST API server
+
+Generation types:
+  promptsmith generate variations <prompt> --count=5
+  promptsmith generate compress <prompt>
+  promptsmith generate expand <prompt>
+
+Benchmark execution:
+  promptsmith benchmark <prompt> --models=gpt-4o,claude-sonnet
+  - Supports multiple models
+  - Collects latency, tokens, cost metrics
+  - Outputs results as JSON or table
+
+API Server:
+  promptsmith serve [--port 8080]
+  - GET  /api/project          Get project info
+  - GET  /api/prompts          List prompts
+  - GET  /api/prompts/:id      Get prompt
+  - GET  /api/prompts/:id/versions  List versions
+  - GET  /api/prompts/:id/diff Get diff
+  - GET  /api/tests            List test suites
+  - GET  /api/tests/:name      Get test suite
+  - POST /api/tests/:name/run  Run test suite
+  - GET  /api/benchmarks       List benchmarks
+  - GET  /api/benchmarks/:name Get benchmark
+  - POST /api/benchmarks/:name/run Run benchmark
+
+
+Phase 5: Cloud Sync & Collaboration [COMPLETE]
+-----------------------------------------------
+  [x] Cloud sync functionality
+  [x] Team collaboration features (push/pull sync)
+  [x] Login/logout authentication commands
+  [x] Sync configuration options
+
+Commands added:
+  promptsmith login               Authenticate with cloud
+    --token <token>               Token-based login
+  promptsmith logout              Log out from cloud
+  promptsmith push                Sync local changes to cloud
+    --force                       Overwrite remote conflicts
+  promptsmith pull                Fetch latest from cloud
+    --force                       Overwrite local changes
+
+New files:
+  cli/cmd/login.go               Login command
+  cli/cmd/logout.go              Logout command
+  cli/cmd/push.go                Push command
+  cli/cmd/pull.go                Pull command
+  cli/internal/sync/client.go    Sync API client
+  cli/internal/sync/client_test.go  Sync tests
+
+Config additions (SyncConfig):
+  sync.remote                    Remote server URL
+  sync.auto_push                 Auto-push on commit
+  sync.team                      Team for collaboration
+
+Environment variables:
+  PROMPTSMITH_TOKEN              Auth token for CI/CD
+
+
+Phase 6: Full Web UI Pages [COMPLETE]
+--------------------------------------
+  [x] Layout nav with active link states (Prompts, Tests, Benchmarks, Settings)
+  [x] Tests listing page (/tests) - search, suite cards
+  [x] Test Detail page (/tests/:name) - run tests, results display
+  [x] Benchmarks listing page (/benchmarks) - search, model tags
+  [x] Benchmark Detail page (/benchmarks/:name) - config, run, results
+  [x] Settings page (/settings) - project info, providers, sync config
+  [x] All routes wired in App.tsx
+
+New files:
+  web/src/pages/TestsPage.tsx              Tests listing
+  web/src/pages/TestsPage.module.css
+  web/src/pages/TestDetailPage.tsx         Test detail + runner
+  web/src/pages/TestDetailPage.module.css
+  web/src/pages/BenchmarksPage.tsx         Benchmarks listing
+  web/src/pages/BenchmarksPage.module.css
+  web/src/pages/BenchmarkDetailPage.tsx    Benchmark detail + runner
+  web/src/pages/BenchmarkDetailPage.module.css
+  web/src/pages/SettingsPage.tsx           Settings & config
+  web/src/pages/SettingsPage.module.css
+
+Web UI routes:
+  /                     Homepage (prompt listing)
+  /prompt/:name         Prompt detail (content, history, diff, tests, benchmarks, generate)
+  /tests                Test suites listing
+  /tests/:name          Test suite detail + runner
+  /benchmarks           Benchmarks listing
+  /benchmarks/:name     Benchmark detail + runner
+  /settings             Settings (project, providers, sync)
+
+
+Build & Test
+------------
+  cd cli
+  go build -o promptsmith .
+  ./promptsmith --help
+  go test ./...              # Run all CLI tests
+
+  cd web
+  npm install
+  npm run dev                # Start dev server
+  npm run test:run           # Run unit tests
+  npm run test:e2e           # Run E2E tests
+
+  # Test flow:
+  mkdir /tmp/test && cd /tmp/test
+  /path/to/promptsmith init my-project
+  echo "Hello {{name}}" > prompts/greeting.prompt
+  /path/to/promptsmith add prompts/greeting.prompt
+  /path/to/promptsmith commit -m "Add greeting"
+  /path/to/promptsmith log
+
+  # Phase 2 commands:
+  /path/to/promptsmith diff greeting                    # Compare working vs latest
+  /path/to/promptsmith diff greeting 1.0.0 1.0.1       # Compare two versions
+  /path/to/promptsmith tag greeting prod               # Tag latest as 'prod'
+  /path/to/promptsmith tag greeting --list             # List tags
+  /path/to/promptsmith checkout greeting prod          # Checkout tagged version
+  /path/to/promptsmith checkout greeting HEAD~1        # Checkout previous version
+
+  # Phase 3 commands:
+  /path/to/promptsmith test                            # Run all tests in tests/
+  /path/to/promptsmith test tests/greeting.test.yaml   # Run specific suite
+  /path/to/promptsmith test --filter "basic"           # Run matching tests
+  /path/to/promptsmith test --version 1.0.0            # Test specific version
+
+  # Phase 4 commands:
+  /path/to/promptsmith generate variations greeting --count=3
+  /path/to/promptsmith benchmark greeting --models=gpt-4o,gpt-4o-mini
+  /path/to/promptsmith serve                           # Start API server
+
+  # Phase 5 commands:
+  /path/to/promptsmith login                           # Interactive login
+  /path/to/promptsmith login --token <token>           # Token login
+  /path/to/promptsmith logout                          # Log out
+  /path/to/promptsmith push                            # Push to cloud
+  /path/to/promptsmith pull                            # Pull from cloud
+  /path/to/promptsmith config sync.remote <url>        # Set remote URL
+  /path/to/promptsmith config sync.team <team>         # Set team
