@@ -146,9 +146,97 @@ func (s *Server) handlePrompts(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		s.listPrompts(w, r)
+	case http.MethodPost:
+		s.createPrompt(w, r)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+type CreatePromptRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	FilePath    string `json:"file_path"`
+	Content     string `json:"content"`
+}
+
+func (s *Server) createPrompt(w http.ResponseWriter, r *http.Request) {
+	var req CreatePromptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	// Check for duplicate
+	existing, err := s.db.GetPromptByName(req.Name)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if existing != nil {
+		writeError(w, http.StatusConflict, fmt.Sprintf("prompt '%s' already exists", req.Name))
+		return
+	}
+
+	// Default file path
+	if req.FilePath == "" {
+		req.FilePath = fmt.Sprintf("prompts/%s.prompt", req.Name)
+	}
+
+	// Get project
+	project, err := s.db.GetProject()
+	if err != nil || project == nil {
+		writeError(w, http.StatusInternalServerError, "no project found")
+		return
+	}
+
+	prompt, err := s.db.CreatePrompt(project.ID, req.Name, req.Description, req.FilePath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Write file to disk
+	filePath := filepath.Join(s.root, req.FilePath)
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create directory: %v", err))
+		return
+	}
+
+	content := req.Content
+	if content == "" {
+		content = fmt.Sprintf("# %s\n", req.Name)
+	}
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
+		return
+	}
+
+	// Create initial version if content provided
+	var versionStr string
+	if req.Content != "" {
+		variables := extractVariables(req.Content)
+		variablesJSON, _ := json.Marshal(variables)
+		v, err := s.db.CreateVersion(prompt.ID, "1.0.0", req.Content, string(variablesJSON), "{}", "Initial version", "web", nil)
+		if err == nil {
+			versionStr = v.Version
+		}
+	}
+
+	writeJSON(w, http.StatusCreated, PromptResponse{
+		ID:          prompt.ID,
+		Name:        prompt.Name,
+		Description: prompt.Description,
+		FilePath:    prompt.FilePath,
+		Version:     versionStr,
+		CreatedAt:   prompt.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	})
 }
 
 func (s *Server) listPrompts(w http.ResponseWriter, r *http.Request) {
@@ -200,19 +288,104 @@ func (s *Server) handlePromptByID(w http.ResponseWriter, r *http.Request) {
 		case "diff":
 			s.handleDiff(w, r, promptID)
 			return
+		case "tags":
+			s.handleTags(w, r, promptID, parts[2:])
+			return
 		}
 	}
 
-	// Get single prompt
-	s.getPrompt(w, r, promptID)
+	// Get single prompt or delete
+	switch r.Method {
+	case http.MethodGet:
+		s.getPrompt(w, r, promptID)
+	case http.MethodDelete:
+		s.deletePrompt(w, r, promptID)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
 }
 
-func (s *Server) getPrompt(w http.ResponseWriter, r *http.Request, promptID string) {
-	if r.Method != http.MethodGet {
+func (s *Server) deletePrompt(w http.ResponseWriter, r *http.Request, promptName string) {
+	prompt, err := s.db.GetPromptByName(promptName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", promptName))
+		return
+	}
+
+	if err := s.db.DeletePrompt(prompt.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type CreateTagRequest struct {
+	Name      string `json:"name"`
+	VersionID string `json:"version_id"`
+}
+
+func (s *Server) handleTags(w http.ResponseWriter, r *http.Request, promptName string, extra []string) {
+	prompt, err := s.db.GetPromptByName(promptName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", promptName))
+		return
+	}
+
+	// DELETE /api/prompts/:name/tags/:tagName
+	if len(extra) > 0 && extra[0] != "" {
+		if r.Method != http.MethodDelete {
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		tagName := extra[0]
+		if err := s.db.DeleteTag(prompt.ID, tagName); err != nil {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// POST /api/prompts/:name/tags
+	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
+	var req CreateTagRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" || req.VersionID == "" {
+		writeError(w, http.StatusBadRequest, "name and version_id are required")
+		return
+	}
+
+	tag, err := s.db.CreateTag(prompt.ID, req.VersionID, req.Name)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]string{
+		"id":         tag.ID,
+		"name":       tag.Name,
+		"version_id": tag.VersionID,
+	})
+}
+
+func (s *Server) getPrompt(w http.ResponseWriter, r *http.Request, promptID string) {
 	// Try to find prompt by ID first, then by name
 	prompt, err := s.db.GetPromptByName(promptID)
 	if err != nil {

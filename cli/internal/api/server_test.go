@@ -912,6 +912,161 @@ func TestExtractVariables(t *testing.T) {
 	}
 }
 
+func TestCreatePrompt(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Create a new prompt
+	body := `{"name": "translator", "description": "Translates text", "content": "Translate {{text}} to {{language}}"}`
+	req := httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response PromptResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Name != "translator" {
+		t.Errorf("name = %q, want %q", response.Name, "translator")
+	}
+	if response.Version != "1.0.0" {
+		t.Errorf("version = %q, want %q", response.Version, "1.0.0")
+	}
+}
+
+func TestCreatePromptValidation(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Empty name
+	body := `{"name": ""}`
+	req := httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Duplicate name
+	body = `{"name": "summarizer"}`
+	req = httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+}
+
+func TestDeletePrompt(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Delete existing prompt
+	req := httptest.NewRequest("DELETE", "/api/prompts/summarizer", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+
+	// Verify it's gone
+	req = httptest.NewRequest("GET", "/api/prompts/summarizer", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("after delete: status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	// Delete non-existent
+	req = httptest.NewRequest("DELETE", "/api/prompts/nonexistent", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("not found: status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestCreateTag(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	prompt, _ := database.GetPromptByName("summarizer")
+	v, _ := database.CreateVersion(prompt.ID, "1.0.0", "content", "[]", "{}", "Initial", "user", nil)
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name": "prod", "version_id": "` + v.ID + `"}`
+	req := httptest.NewRequest("POST", "/api/prompts/summarizer/tags", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response["name"] != "prod" {
+		t.Errorf("name = %q, want %q", response["name"], "prod")
+	}
+}
+
+func TestDeleteTag(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	prompt, _ := database.GetPromptByName("summarizer")
+	v, _ := database.CreateVersion(prompt.ID, "1.0.0", "content", "[]", "{}", "Initial", "user", nil)
+	database.CreateTag(prompt.ID, v.ID, "staging")
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("DELETE", "/api/prompts/summarizer/tags/staging", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNoContent)
+	}
+
+	// Delete non-existent tag
+	req = httptest.NewRequest("DELETE", "/api/prompts/summarizer/tags/nonexistent", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("not found: status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestGenerateEndpointDefaults(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
