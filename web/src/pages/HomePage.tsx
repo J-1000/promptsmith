@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listPrompts, listTests, listBenchmarks, Prompt, TestSuite, BenchmarkSuite } from '../api'
+import { listPrompts, listTests, listBenchmarks, createPrompt, Prompt, TestSuite, BenchmarkSuite } from '../api'
+import { Toast } from '../components/Toast'
 import styles from './HomePage.module.css'
 
 export function HomePage() {
@@ -10,6 +11,12 @@ export function HomePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [newContent, setNewContent] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -33,21 +40,44 @@ export function HomePage() {
 
   const totalTests = tests.reduce((sum, s) => sum + s.test_count, 0)
 
-  const handleRefresh = () => {
-    setLoading(true)
-    setError(null)
-    Promise.all([
+  const refreshData = () => {
+    return Promise.all([
       listPrompts(),
       listTests().catch(() => [] as TestSuite[]),
       listBenchmarks().catch(() => [] as BenchmarkSuite[]),
-    ])
-      .then(([promptsData, testsData, benchmarksData]) => {
-        setPrompts(promptsData)
-        setTests(testsData)
-        setBenchmarks(benchmarksData)
-      })
+    ]).then(([promptsData, testsData, benchmarksData]) => {
+      setPrompts(promptsData)
+      setTests(testsData)
+      setBenchmarks(benchmarksData)
+    })
+  }
+
+  const handleRefresh = () => {
+    setLoading(true)
+    setError(null)
+    refreshData()
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
+  }
+
+  const handleCreatePrompt = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreating(true)
+    try {
+      await createPrompt(newName.trim(), newDescription.trim(), newContent.trim() || undefined)
+      setShowNewModal(false)
+      setNewName('')
+      setNewDescription('')
+      setNewContent('')
+      await refreshData()
+      setToast({ message: `Prompt "${newName.trim()}" created`, type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create prompt'
+      setToast({ message: msg, type: 'error' })
+    } finally {
+      setCreating(false)
+    }
   }
 
   if (loading) {
@@ -98,14 +128,22 @@ export function HomePage() {
               {prompts.length} prompts tracked
             </p>
           </div>
-          <button
-            className={styles.refreshButton}
-            onClick={handleRefresh}
-            disabled={loading}
-            title="Refresh prompts"
-          >
-            {loading ? '...' : '↻'}
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={styles.newButton}
+              onClick={() => setShowNewModal(true)}
+            >
+              + New Prompt
+            </button>
+            <button
+              className={styles.refreshButton}
+              onClick={handleRefresh}
+              disabled={loading}
+              title="Refresh prompts"
+            >
+              {loading ? '...' : '↻'}
+            </button>
+          </div>
         </div>
         {prompts.length > 0 && (
           <input
@@ -146,6 +184,59 @@ export function HomePage() {
             </Link>
           ))}
         </div>
+      )}
+
+      {showNewModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowNewModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>New Prompt</h2>
+            <form onSubmit={handleCreatePrompt} className={styles.modalForm}>
+              <label className={styles.label}>
+                Name
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="my-prompt"
+                  autoFocus
+                />
+              </label>
+              <label className={styles.label}>
+                Description
+                <input
+                  type="text"
+                  className={styles.input}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  placeholder="What does this prompt do?"
+                />
+              </label>
+              <label className={styles.label}>
+                Content (optional)
+                <textarea
+                  className={styles.textarea}
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  placeholder="You are a helpful assistant..."
+                  rows={4}
+                />
+              </label>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.cancelButton} onClick={() => setShowNewModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className={styles.submitButton} disabled={creating || !newName.trim()}>
+                  {creating ? 'Creating...' : 'Create'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />
       )}
     </div>
   )

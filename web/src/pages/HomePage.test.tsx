@@ -8,9 +8,10 @@ vi.mock('../api', () => ({
   listPrompts: vi.fn(),
   listTests: vi.fn(),
   listBenchmarks: vi.fn(),
+  createPrompt: vi.fn(),
 }))
 
-import { listPrompts, listTests, listBenchmarks } from '../api'
+import { listPrompts, listTests, listBenchmarks, createPrompt } from '../api'
 
 const mockPrompts = [
   {
@@ -143,5 +144,51 @@ describe('HomePage', () => {
     await user.type(searchInput, 'nonexistent')
 
     expect(screen.getByText(/no prompts matching "nonexistent"/i)).toBeInTheDocument()
+  })
+
+  it('shows New Prompt button', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByText('+ New Prompt')).toBeInTheDocument()
+    })
+  })
+
+  it('opens modal when New Prompt clicked', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    renderWithRouter(<HomePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('+ New Prompt')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('+ New Prompt'))
+    expect(screen.getByText('New Prompt', { selector: 'h2' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('my-prompt')).toBeInTheDocument()
+  })
+
+  it('submits new prompt form', async () => {
+    const user = (await import('@testing-library/user-event')).default.setup()
+    vi.mocked(createPrompt).mockResolvedValue({
+      id: '4',
+      name: 'new-one',
+      description: 'A new prompt',
+      file_path: 'prompts/new-one.prompt',
+      version: '1.0.0',
+      created_at: '2024-01-16T00:00:00Z',
+    })
+    renderWithRouter(<HomePage />)
+
+    await waitFor(() => {
+      expect(screen.getByText('+ New Prompt')).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByText('+ New Prompt'))
+    await user.type(screen.getByPlaceholderText('my-prompt'), 'new-one')
+    await user.type(screen.getByPlaceholderText('What does this prompt do?'), 'A new prompt')
+    await user.click(screen.getByText('Create'))
+
+    await waitFor(() => {
+      expect(createPrompt).toHaveBeenCalledWith('new-one', 'A new prompt', undefined)
+    })
   })
 })
