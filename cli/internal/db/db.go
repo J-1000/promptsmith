@@ -497,6 +497,36 @@ func (db *DB) DeleteTag(promptID, name string) error {
 	return nil
 }
 
+func (db *DB) DeletePrompt(promptID string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Delete tags first (references versions and prompts)
+	if _, err := tx.Exec("DELETE FROM tags WHERE prompt_id = ?", promptID); err != nil {
+		return fmt.Errorf("failed to delete tags: %w", err)
+	}
+
+	// Delete versions (references prompts)
+	if _, err := tx.Exec("DELETE FROM prompt_versions WHERE prompt_id = ?", promptID); err != nil {
+		return fmt.Errorf("failed to delete versions: %w", err)
+	}
+
+	// Delete the prompt itself
+	result, err := tx.Exec("DELETE FROM prompts WHERE id = ?", promptID)
+	if err != nil {
+		return fmt.Errorf("failed to delete prompt: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("prompt not found")
+	}
+
+	return tx.Commit()
+}
+
 func (db *DB) GetAllVersionsForLog() ([]struct {
 	Prompt  *Prompt
 	Version *PromptVersion

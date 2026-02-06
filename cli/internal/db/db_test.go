@@ -281,6 +281,56 @@ func TestTags(t *testing.T) {
 	}
 }
 
+func TestDeletePrompt(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	prompt, _ := db.CreatePrompt(project.ID, "to-delete", "Will be deleted", "prompts/delete.prompt")
+	v1, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content v1", "[]", "{}", "Initial", "user", nil)
+	db.CreateVersion(prompt.ID, "1.0.1", "Content v2", "[]", "{}", "Update", "user", &v1.ID)
+	db.CreateTag(prompt.ID, v1.ID, "prod")
+
+	// Delete prompt (should cascade)
+	err := db.DeletePrompt(prompt.ID)
+	if err != nil {
+		t.Fatalf("DeletePrompt failed: %v", err)
+	}
+
+	// Verify prompt is gone
+	found, err := db.GetPromptByName("to-delete")
+	if err != nil {
+		t.Fatalf("GetPromptByName failed: %v", err)
+	}
+	if found != nil {
+		t.Error("expected prompt to be deleted")
+	}
+
+	// Verify versions are gone
+	versions, err := db.ListVersions(prompt.ID)
+	if err != nil {
+		t.Fatalf("ListVersions failed: %v", err)
+	}
+	if len(versions) != 0 {
+		t.Errorf("expected 0 versions, got %d", len(versions))
+	}
+
+	// Verify tags are gone
+	tags, err := db.ListTags(prompt.ID)
+	if err != nil {
+		t.Fatalf("ListTags failed: %v", err)
+	}
+	if len(tags) != 0 {
+		t.Errorf("expected 0 tags, got %d", len(tags))
+	}
+
+	// Delete non-existent prompt
+	err = db.DeletePrompt("nonexistent-id")
+	if err == nil {
+		t.Error("expected error when deleting non-existent prompt")
+	}
+}
+
 func TestFindProjectRoot(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "promptsmith-test-*")
 	if err != nil {
