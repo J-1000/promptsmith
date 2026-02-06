@@ -241,8 +241,19 @@ func (s *Server) getPrompt(w http.ResponseWriter, r *http.Request, promptID stri
 	writeJSON(w, http.StatusOK, response)
 }
 
+type CreateVersionRequest struct {
+	Content       string `json:"content"`
+	CommitMessage string `json:"commit_message"`
+}
+
 func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request, promptID string) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		// continue below
+	case http.MethodPost:
+		s.createVersion(w, r, promptID)
+		return
+	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
@@ -290,6 +301,101 @@ func (s *Server) handleVersions(w http.ResponseWriter, r *http.Request, promptID
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) createVersion(w http.ResponseWriter, r *http.Request, promptName string) {
+	var req CreateVersionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Content == "" {
+		writeError(w, http.StatusBadRequest, "content is required")
+		return
+	}
+	if req.CommitMessage == "" {
+		req.CommitMessage = "Updated via web editor"
+	}
+
+	// Find prompt
+	prompt, err := s.db.GetPromptByName(promptName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", promptName))
+		return
+	}
+
+	// Get latest version to compute next version
+	latest, _ := s.db.GetLatestVersion(prompt.ID)
+	nextVersion := "1.0.0"
+	var parentID *string
+	if latest != nil {
+		nextVersion = bumpPatch(latest.Version)
+		parentID = &latest.ID
+	}
+
+	// Extract variables from content ({{varName}} pattern)
+	variables := extractVariables(req.Content)
+	variablesJSON, _ := json.Marshal(variables)
+
+	version, err := s.db.CreateVersion(
+		prompt.ID,
+		nextVersion,
+		req.Content,
+		string(variablesJSON),
+		"{}",
+		req.CommitMessage,
+		"web",
+		parentID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, VersionResponse{
+		ID:            version.ID,
+		Version:       version.Version,
+		Content:       version.Content,
+		CommitMessage: version.CommitMessage,
+		CreatedAt:     version.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+func bumpPatch(version string) string {
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return "1.0.1"
+	}
+	patch := 0
+	fmt.Sscanf(parts[2], "%d", &patch)
+	return fmt.Sprintf("%s.%s.%d", parts[0], parts[1], patch+1)
+}
+
+func extractVariables(content string) []string {
+	var vars []string
+	seen := make(map[string]bool)
+	i := 0
+	for i < len(content)-3 {
+		if content[i] == '{' && content[i+1] == '{' {
+			end := strings.Index(content[i+2:], "}}")
+			if end >= 0 {
+				varName := strings.TrimSpace(content[i+2 : i+2+end])
+				if varName != "" && !seen[varName] {
+					vars = append(vars, varName)
+					seen[varName] = true
+				}
+				i = i + 2 + end + 2
+				continue
+			}
+		}
+		i++
+	}
+	return vars
 }
 
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request, promptID string) {
