@@ -761,6 +761,157 @@ func TestGenerateEndpointValidation(t *testing.T) {
 	}
 }
 
+func TestCreateVersion(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create an initial version
+	prompt, _ := database.GetPromptByName("summarizer")
+	database.CreateVersion(prompt.ID, "1.0.0", "initial content", "[]", "{}", "Initial", "user", nil)
+
+	server := NewServer(database, tmpDir)
+
+	// Create new version via API
+	body := `{"content": "Hello {{name}}, welcome to {{place}}!", "commit_message": "Add variables"}`
+	req := httptest.NewRequest("POST", "/api/prompts/summarizer/versions", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response VersionResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Version != "1.0.1" {
+		t.Errorf("version = %q, want %q", response.Version, "1.0.1")
+	}
+	if response.Content != "Hello {{name}}, welcome to {{place}}!" {
+		t.Errorf("content mismatch")
+	}
+	if response.CommitMessage != "Add variables" {
+		t.Errorf("commit_message = %q, want %q", response.CommitMessage, "Add variables")
+	}
+}
+
+func TestCreateVersionFirstVersion(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Create first version (no existing versions)
+	body := `{"content": "new prompt content"}`
+	req := httptest.NewRequest("POST", "/api/prompts/summarizer/versions", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response VersionResponse
+	json.NewDecoder(rec.Body).Decode(&response)
+
+	if response.Version != "1.0.0" {
+		t.Errorf("version = %q, want %q", response.Version, "1.0.0")
+	}
+	if response.CommitMessage != "Updated via web editor" {
+		t.Errorf("commit_message = %q, want default message", response.CommitMessage)
+	}
+}
+
+func TestCreateVersionValidation(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Empty content
+	body := `{"content": ""}`
+	req := httptest.NewRequest("POST", "/api/prompts/summarizer/versions", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Invalid JSON
+	req = httptest.NewRequest("POST", "/api/prompts/summarizer/versions", strings.NewReader("not json"))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Non-existent prompt
+	body = `{"content": "test"}`
+	req = httptest.NewRequest("POST", "/api/prompts/nonexistent/versions", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestBumpPatch(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"1.0.0", "1.0.1"},
+		{"1.0.9", "1.0.10"},
+		{"2.3.5", "2.3.6"},
+		{"0.0.0", "0.0.1"},
+		{"invalid", "1.0.1"},
+	}
+
+	for _, tt := range tests {
+		result := bumpPatch(tt.input)
+		if result != tt.expected {
+			t.Errorf("bumpPatch(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+func TestExtractVariables(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected []string
+	}{
+		{"Hello {{name}}", []string{"name"}},
+		{"{{a}} and {{b}}", []string{"a", "b"}},
+		{"{{ name }} with spaces", []string{"name"}},
+		{"no variables here", nil},
+		{"{{a}} then {{a}} again", []string{"a"}}, // dedup
+		{"{{x}} {{y}} {{z}}", []string{"x", "y", "z"}},
+	}
+
+	for _, tt := range tests {
+		result := extractVariables(tt.input)
+		if len(result) != len(tt.expected) {
+			t.Errorf("extractVariables(%q) = %v, want %v", tt.input, result, tt.expected)
+			continue
+		}
+		for i := range result {
+			if result[i] != tt.expected[i] {
+				t.Errorf("extractVariables(%q)[%d] = %q, want %q", tt.input, i, result[i], tt.expected[i])
+			}
+		}
+	}
+}
+
 func TestGenerateEndpointDefaults(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
