@@ -6,9 +6,11 @@ import { HomePage } from './HomePage'
 // Mock the API
 vi.mock('../api', () => ({
   listPrompts: vi.fn(),
+  listTests: vi.fn(),
+  listBenchmarks: vi.fn(),
 }))
 
-import { listPrompts } from '../api'
+import { listPrompts, listTests, listBenchmarks } from '../api'
 
 const mockPrompts = [
   {
@@ -44,6 +46,12 @@ function renderWithRouter(ui: React.ReactElement) {
 describe('HomePage', () => {
   beforeEach(() => {
     vi.mocked(listPrompts).mockResolvedValue(mockPrompts)
+    vi.mocked(listTests).mockResolvedValue([
+      { name: 'greeting-tests', file_path: 'tests/greeting.test.yaml', prompt: 'greeting', test_count: 3 },
+    ])
+    vi.mocked(listBenchmarks).mockResolvedValue([
+      { name: 'greeting-bench', file_path: 'benchmarks/greeting.bench.yaml', prompt: 'greeting', models: ['gpt-4o'], runs_per_model: 5 },
+    ])
   })
 
   it('renders the page title', async () => {

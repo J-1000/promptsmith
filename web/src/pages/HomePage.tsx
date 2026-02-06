@@ -1,17 +1,27 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listPrompts, Prompt } from '../api'
+import { listPrompts, listTests, listBenchmarks, Prompt, TestSuite, BenchmarkSuite } from '../api'
 import styles from './HomePage.module.css'
 
 export function HomePage() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
+  const [tests, setTests] = useState<TestSuite[]>([])
+  const [benchmarks, setBenchmarks] = useState<BenchmarkSuite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    listPrompts()
-      .then(setPrompts)
+    Promise.all([
+      listPrompts(),
+      listTests().catch(() => [] as TestSuite[]),
+      listBenchmarks().catch(() => [] as BenchmarkSuite[]),
+    ])
+      .then(([promptsData, testsData, benchmarksData]) => {
+        setPrompts(promptsData)
+        setTests(testsData)
+        setBenchmarks(benchmarksData)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -21,11 +31,21 @@ export function HomePage() {
     p.description?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const totalTests = tests.reduce((sum, s) => sum + s.test_count, 0)
+
   const handleRefresh = () => {
     setLoading(true)
     setError(null)
-    listPrompts()
-      .then(setPrompts)
+    Promise.all([
+      listPrompts(),
+      listTests().catch(() => [] as TestSuite[]),
+      listBenchmarks().catch(() => [] as BenchmarkSuite[]),
+    ])
+      .then(([promptsData, testsData, benchmarksData]) => {
+        setPrompts(promptsData)
+        setTests(testsData)
+        setBenchmarks(benchmarksData)
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }
@@ -51,6 +71,25 @@ export function HomePage() {
 
   return (
     <div className={styles.container}>
+      <div className={styles.stats}>
+        <Link to="/" className={styles.statCard}>
+          <span className={styles.statValue}>{prompts.length}</span>
+          <span className={styles.statLabel}>Prompts</span>
+        </Link>
+        <Link to="/tests" className={styles.statCard}>
+          <span className={styles.statValue}>{tests.length}</span>
+          <span className={styles.statLabel}>Test Suites</span>
+        </Link>
+        <Link to="/tests" className={styles.statCard}>
+          <span className={styles.statValue}>{totalTests}</span>
+          <span className={styles.statLabel}>Test Cases</span>
+        </Link>
+        <Link to="/benchmarks" className={styles.statCard}>
+          <span className={styles.statValue}>{benchmarks.length}</span>
+          <span className={styles.statLabel}>Benchmarks</span>
+        </Link>
+      </div>
+
       <div className={styles.header}>
         <div className={styles.headerRow}>
           <div className={styles.headerTop}>
