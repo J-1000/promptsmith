@@ -279,23 +279,37 @@ Phase 6: Full Web UI Pages [COMPLETE]
   [x] Benchmarks listing page (/benchmarks) - search, model tags
   [x] Benchmark Detail page (/benchmarks/:name) - config, run, results
   [x] Settings page (/settings) - project info, providers, sync config
+  [x] Dashboard stats bar (prompts, test suites, test cases, benchmarks)
+  [x] Prompt editor page (/prompt/:name/edit) - variable extraction, token counter
+  [x] POST /api/prompts/:name/versions endpoint for creating versions
   [x] All routes wired in App.tsx
+  [x] Unit tests for all new pages (43 new web tests)
+  [x] Go tests for new API endpoint and helpers (5 new Go tests)
 
 New files:
   web/src/pages/TestsPage.tsx              Tests listing
   web/src/pages/TestsPage.module.css
+  web/src/pages/TestsPage.test.tsx         Tests (8 tests)
   web/src/pages/TestDetailPage.tsx         Test detail + runner
   web/src/pages/TestDetailPage.module.css
+  web/src/pages/TestDetailPage.test.tsx    Tests (8 tests)
   web/src/pages/BenchmarksPage.tsx         Benchmarks listing
   web/src/pages/BenchmarksPage.module.css
+  web/src/pages/BenchmarksPage.test.tsx    Tests (6 tests)
   web/src/pages/BenchmarkDetailPage.tsx    Benchmark detail + runner
   web/src/pages/BenchmarkDetailPage.module.css
+  web/src/pages/BenchmarkDetailPage.test.tsx Tests (7 tests)
   web/src/pages/SettingsPage.tsx           Settings & config
   web/src/pages/SettingsPage.module.css
+  web/src/pages/SettingsPage.test.tsx      Tests (7 tests)
+  web/src/pages/EditorPage.tsx             Prompt editor
+  web/src/pages/EditorPage.module.css
+  web/src/pages/EditorPage.test.tsx        Tests (7 tests)
 
 Web UI routes:
-  /                     Homepage (prompt listing)
+  /                     Homepage (dashboard stats + prompt listing)
   /prompt/:name         Prompt detail (content, history, diff, tests, benchmarks, generate)
+  /prompt/:name/edit    Prompt editor (variable extraction, token counter, save)
   /tests                Test suites listing
   /tests/:name          Test suite detail + runner
   /benchmarks           Benchmarks listing
