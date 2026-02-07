@@ -2814,3 +2814,46 @@ func TestConfigCommandInvalidTemperature(t *testing.T) {
 		t.Error("expected error for negative temperature")
 	}
 }
+
+func TestBenchmarkCompareRequiresTwoArgs(t *testing.T) {
+	cmd := benchmarkCompareCmd
+	// No args
+	err := cmd.Args(cmd, []string{})
+	if err == nil {
+		t.Error("expected error with no args")
+	}
+	// One arg
+	err = cmd.Args(cmd, []string{"a.json"})
+	if err == nil {
+		t.Error("expected error with one arg")
+	}
+	// Two args is valid
+	err = cmd.Args(cmd, []string{"a.json", "b.json"})
+	if err != nil {
+		t.Errorf("expected no error with two args, got: %v", err)
+	}
+}
+
+func TestBenchmarkCompareReadFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	results1 := `[{"suite_name":"test","prompt_name":"p","version":"1.0","models":[{"model":"gpt-4o","runs":5,"errors":0,"error_rate":0,"latency_p50_ms":200,"latency_p99_ms":400,"total_tokens_avg":150,"cost_per_request":0.005}],"duration_ms":1000}]`
+	results2 := `[{"suite_name":"test","prompt_name":"p","version":"1.1","models":[{"model":"gpt-4o","runs":5,"errors":1,"error_rate":0.2,"latency_p50_ms":180,"latency_p99_ms":350,"total_tokens_avg":140,"cost_per_request":0.004}],"duration_ms":900}]`
+
+	f1 := filepath.Join(dir, "baseline.json")
+	f2 := filepath.Join(dir, "latest.json")
+	os.WriteFile(f1, []byte(results1), 0644)
+	os.WriteFile(f2, []byte(results2), 0644)
+
+	err := runBenchmarkCompare(&cobra.Command{}, []string{f1, f2})
+	if err != nil {
+		t.Errorf("expected no error, got: %v", err)
+	}
+}
+
+func TestBenchmarkCompareMissingFile(t *testing.T) {
+	err := runBenchmarkCompare(&cobra.Command{}, []string{"/nonexistent/a.json", "/nonexistent/b.json"})
+	if err == nil {
+		t.Error("expected error for missing file")
+	}
+}

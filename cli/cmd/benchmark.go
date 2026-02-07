@@ -38,11 +38,23 @@ Examples:
 	RunE: runBenchmark,
 }
 
+var benchmarkCompareCmd = &cobra.Command{
+	Use:   "compare <file1.json> <file2.json>",
+	Short: "Compare two benchmark result files",
+	Long: `Compare two JSON benchmark result files and show a delta table.
+
+Examples:
+  promptsmith benchmark compare baseline.json latest.json`,
+	Args: cobra.ExactArgs(2),
+	RunE: runBenchmarkCompare,
+}
+
 func init() {
 	benchmarkCmd.Flags().StringVarP(&benchModels, "models", "m", "", "comma-separated list of models to benchmark")
 	benchmarkCmd.Flags().IntVarP(&benchRuns, "runs", "r", 0, "number of runs per model (overrides suite config)")
 	benchmarkCmd.Flags().StringVarP(&benchVersion, "version", "v", "", "benchmark against specific prompt version")
 	benchmarkCmd.Flags().StringVarP(&benchOutput, "output", "o", "", "write results to file (JSON format)")
+	benchmarkCmd.AddCommand(benchmarkCompareCmd)
 	rootCmd.AddCommand(benchmarkCmd)
 }
 
@@ -207,6 +219,113 @@ func printBenchmarkTable(result *benchmark.BenchmarkResult) {
 
 	fmt.Printf("  %s\n", dim(strings.Repeat("─", 66)))
 	fmt.Printf("  %s %dms\n", dim("Total time:"), result.DurationMs)
+}
+
+func runBenchmarkCompare(cmd *cobra.Command, args []string) error {
+	file1, file2 := args[0], args[1]
+
+	data1, err := os.ReadFile(file1)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", file1, err)
+	}
+
+	data2, err := os.ReadFile(file2)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", file2, err)
+	}
+
+	var results1, results2 []*benchmark.BenchmarkResult
+	if err := json.Unmarshal(data1, &results1); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", file1, err)
+	}
+	if err := json.Unmarshal(data2, &results2); err != nil {
+		return fmt.Errorf("failed to parse %s: %w", file2, err)
+	}
+
+	if len(results1) == 0 || len(results2) == 0 {
+		return fmt.Errorf("both files must contain at least one benchmark result")
+	}
+
+	cyan := color.New(color.FgCyan).SprintFunc()
+	green := color.New(color.FgGreen).SprintFunc()
+	red := color.New(color.FgRed).SprintFunc()
+	dim := color.New(color.Faint).SprintFunc()
+
+	fmt.Printf("\n%s Comparing %s vs %s\n", cyan("▶"), file1, file2)
+
+	// Build model map from both results
+	r1 := results1[0]
+	r2 := results2[0]
+
+	modelMap1 := map[string]*benchmark.ModelResult{}
+	for i := range r1.Models {
+		modelMap1[r1.Models[i].Model] = &r1.Models[i]
+	}
+
+	fmt.Printf("\n  %-20s %12s %12s %12s\n", "Model", "Latency Δ", "Cost Δ", "Errors Δ")
+	fmt.Printf("  %s\n", dim(strings.Repeat("─", 60)))
+
+	for _, m2 := range r2.Models {
+		m1, ok := modelMap1[m2.Model]
+		if !ok {
+			fmt.Printf("  %-20s %12s %12s %12s\n", m2.Model, "new", "new", "new")
+			continue
+		}
+
+		latDelta := m2.LatencyP50Ms - m1.LatencyP50Ms
+		costDelta := m2.CostPerRequest - m1.CostPerRequest
+		errDelta := m2.Errors - m1.Errors
+
+		latStr := formatDelta(latDelta, "ms", true, green, red)
+		costStr := formatCostDelta(costDelta, green, red)
+		errStr := formatIntDelta(errDelta, green, red)
+
+		fmt.Printf("  %-20s %12s %12s %12s\n", m2.Model, latStr, costStr, errStr)
+	}
+
+	fmt.Printf("  %s\n", dim(strings.Repeat("─", 60)))
+	return nil
+}
+
+func formatDelta(delta float64, unit string, lowerBetter bool, green, red func(a ...interface{}) string) string {
+	if delta == 0 {
+		return fmt.Sprintf("0%s", unit)
+	}
+	sign := "+"
+	colorFn := red
+	if (lowerBetter && delta < 0) || (!lowerBetter && delta > 0) {
+		colorFn = green
+	}
+	if delta < 0 {
+		sign = ""
+	}
+	return colorFn(fmt.Sprintf("%s%.0f%s", sign, delta, unit))
+}
+
+func formatCostDelta(delta float64, green, red func(a ...interface{}) string) string {
+	if delta == 0 {
+		return "$0"
+	}
+	sign := "+"
+	colorFn := red
+	if delta < 0 {
+		sign = ""
+		colorFn = green
+	}
+	return colorFn(fmt.Sprintf("%s$%.4f", sign, delta))
+}
+
+func formatIntDelta(delta int, green, red func(a ...interface{}) string) string {
+	if delta == 0 {
+		return "0"
+	}
+	sign := "+"
+	colorFn := red
+	if delta < 0 {
+		sign = ""
+		colorFn = green
+	}
+	return colorFn(fmt.Sprintf("%s%d", sign, delta))
 }
 
 func printRecommendation(result *benchmark.BenchmarkResult, yellow func(a ...interface{}) string) {
