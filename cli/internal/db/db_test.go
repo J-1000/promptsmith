@@ -376,6 +376,92 @@ func TestFindProjectRoot(t *testing.T) {
 	}
 }
 
+func TestSaveAndListTestRuns(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
+	v, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content", "[]", "{}", "Init", "user", nil)
+
+	// Save test run
+	run, err := db.SaveTestRun("suite-1", v.ID, "passed", `{"passed": 3, "failed": 0}`)
+	if err != nil {
+		t.Fatalf("SaveTestRun failed: %v", err)
+	}
+	if run.ID == "" {
+		t.Error("run ID should not be empty")
+	}
+	if run.Status != "passed" {
+		t.Errorf("expected status 'passed', got '%s'", run.Status)
+	}
+
+	// Save another run
+	db.SaveTestRun("suite-1", v.ID, "failed", `{"passed": 2, "failed": 1}`)
+
+	// List test runs
+	runs, err := db.ListTestRuns("suite-1")
+	if err != nil {
+		t.Fatalf("ListTestRuns failed: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Errorf("expected 2 runs, got %d", len(runs))
+	}
+
+	// Get single test run
+	retrieved, err := db.GetTestRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetTestRun failed: %v", err)
+	}
+	if retrieved.ID != run.ID {
+		t.Errorf("expected ID '%s', got '%s'", run.ID, retrieved.ID)
+	}
+
+	// Get non-existent run
+	notFound, err := db.GetTestRun("nonexistent")
+	if err != nil {
+		t.Fatalf("GetTestRun failed: %v", err)
+	}
+	if notFound != nil {
+		t.Error("expected nil for non-existent run")
+	}
+}
+
+func TestSaveAndListBenchmarkRuns(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
+	v, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content", "[]", "{}", "Init", "user", nil)
+
+	// Save benchmark run
+	run, err := db.SaveBenchmarkRun("bench-1", v.ID, `{"models": []}`)
+	if err != nil {
+		t.Fatalf("SaveBenchmarkRun failed: %v", err)
+	}
+	if run.ID == "" {
+		t.Error("run ID should not be empty")
+	}
+
+	// Save another run
+	db.SaveBenchmarkRun("bench-1", v.ID, `{"models": [{"model": "gpt-4o"}]}`)
+
+	// List benchmark runs
+	runs, err := db.ListBenchmarkRuns("bench-1")
+	if err != nil {
+		t.Fatalf("ListBenchmarkRuns failed: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Errorf("expected 2 runs, got %d", len(runs))
+	}
+
+	// Verify ordering (newest first)
+	if runs[0].CreatedAt.Before(runs[1].CreatedAt) {
+		t.Error("expected runs ordered newest first")
+	}
+}
+
 func TestGetVersionByID(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()

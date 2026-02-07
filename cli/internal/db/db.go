@@ -59,6 +59,24 @@ type Tag struct {
 	CreatedAt time.Time
 }
 
+type TestRun struct {
+	ID          string
+	SuiteID     string
+	VersionID   string
+	Status      string
+	Results     string // JSON
+	StartedAt   time.Time
+	CompletedAt time.Time
+}
+
+type BenchmarkRun struct {
+	ID          string
+	BenchmarkID string
+	VersionID   string
+	Results     string // JSON
+	CreatedAt   time.Time
+}
+
 func NewUUID() string {
 	return uuid.New().String()
 }
@@ -586,4 +604,110 @@ func (db *DB) GetAllVersionsForLog() ([]struct {
 		}{&p, &v})
 	}
 	return results, nil
+}
+
+// Test Run methods
+
+func (db *DB) SaveTestRun(suiteID, versionID, status, results string) (*TestRun, error) {
+	run := &TestRun{
+		ID:          NewUUID(),
+		SuiteID:     suiteID,
+		VersionID:   versionID,
+		Status:      status,
+		Results:     results,
+		StartedAt:   time.Now(),
+		CompletedAt: time.Now(),
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO test_runs (id, suite_id, version_id, status, results, started_at, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		run.ID, run.SuiteID, run.VersionID, run.Status, run.Results, run.StartedAt, run.CompletedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save test run: %w", err)
+	}
+	return run, nil
+}
+
+func (db *DB) ListTestRuns(suiteID string) ([]*TestRun, error) {
+	rows, err := db.Query(
+		`SELECT id, suite_id, version_id, status, results, started_at, completed_at
+		FROM test_runs WHERE suite_id = ? ORDER BY started_at DESC`,
+		suiteID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []*TestRun
+	for rows.Next() {
+		var r TestRun
+		if err := rows.Scan(&r.ID, &r.SuiteID, &r.VersionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt); err != nil {
+			return nil, err
+		}
+		runs = append(runs, &r)
+	}
+	return runs, nil
+}
+
+func (db *DB) GetTestRun(runID string) (*TestRun, error) {
+	var r TestRun
+	err := db.QueryRow(
+		`SELECT id, suite_id, version_id, status, results, started_at, completed_at
+		FROM test_runs WHERE id = ?`,
+		runID,
+	).Scan(&r.ID, &r.SuiteID, &r.VersionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+// Benchmark Run methods
+
+func (db *DB) SaveBenchmarkRun(benchmarkID, versionID, results string) (*BenchmarkRun, error) {
+	run := &BenchmarkRun{
+		ID:          NewUUID(),
+		BenchmarkID: benchmarkID,
+		VersionID:   versionID,
+		Results:     results,
+		CreatedAt:   time.Now(),
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO benchmark_runs (id, benchmark_id, version_id, results, created_at)
+		VALUES (?, ?, ?, ?, ?)`,
+		run.ID, run.BenchmarkID, run.VersionID, run.Results, run.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to save benchmark run: %w", err)
+	}
+	return run, nil
+}
+
+func (db *DB) ListBenchmarkRuns(benchmarkID string) ([]*BenchmarkRun, error) {
+	rows, err := db.Query(
+		`SELECT id, benchmark_id, version_id, results, created_at
+		FROM benchmark_runs WHERE benchmark_id = ? ORDER BY created_at DESC`,
+		benchmarkID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var runs []*BenchmarkRun
+	for rows.Next() {
+		var r BenchmarkRun
+		if err := rows.Scan(&r.ID, &r.BenchmarkID, &r.VersionID, &r.Results, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		runs = append(runs, &r)
+	}
+	return runs, nil
 }
