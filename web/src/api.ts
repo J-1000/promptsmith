@@ -322,6 +322,41 @@ export async function generateCompression(prompt: string, goal?: string, model?:
   });
 }
 
+// Comments
+export interface Comment {
+  id: string;
+  prompt_id: string;
+  version_id: string;
+  line_number: number;
+  content: string;
+  created_at: string;
+}
+
+export async function listComments(promptName: string): Promise<Comment[]> {
+  return fetchApi<Comment[]>(`/api/prompts/${promptName}/comments`);
+}
+
+export async function createComment(
+  promptName: string,
+  versionId: string,
+  lineNumber: number,
+  content: string
+): Promise<Comment> {
+  return fetchApi<Comment>(`/api/prompts/${promptName}/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ version_id: versionId, line_number: lineNumber, content }),
+  });
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/comments/${commentId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  });
+}
+
 export async function generateExpansion(prompt: string, goal?: string, model?: string): Promise<GenerateResult> {
   return fetchApi<GenerateResult>('/api/generate/expand', {
     method: 'POST',
