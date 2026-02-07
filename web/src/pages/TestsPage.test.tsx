@@ -5,9 +5,10 @@ import { TestsPage } from './TestsPage'
 
 vi.mock('../api', () => ({
   listTests: vi.fn(),
+  listTestRuns: vi.fn(),
 }))
 
-import { listTests } from '../api'
+import { listTests, listTestRuns } from '../api'
 
 const mockSuites = [
   {
@@ -32,6 +33,7 @@ function renderWithRouter(ui: React.ReactElement) {
 describe('TestsPage', () => {
   beforeEach(() => {
     vi.mocked(listTests).mockResolvedValue(mockSuites)
+    vi.mocked(listTestRuns).mockResolvedValue([])
   })
 
   it('renders the page title', async () => {
@@ -83,6 +85,22 @@ describe('TestsPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/no test suites found/i)).toBeInTheDocument()
     })
+  })
+
+  it('shows flaky badge for suites with high flakiness', async () => {
+    const runs = [
+      { id: '1', suite_id: 'greeting-tests', status: 'passed', results: {} as never, started_at: '', completed_at: '' },
+      { id: '2', suite_id: 'greeting-tests', status: 'failed', results: {} as never, started_at: '', completed_at: '' },
+      { id: '3', suite_id: 'greeting-tests', status: 'passed', results: {} as never, started_at: '', completed_at: '' },
+      { id: '4', suite_id: 'greeting-tests', status: 'failed', results: {} as never, started_at: '', completed_at: '' },
+    ]
+    vi.mocked(listTestRuns).mockImplementation((name: string) =>
+      name === 'greeting-tests' ? Promise.resolve(runs) : Promise.resolve([])
+    )
+    renderWithRouter(<TestsPage />)
+    await waitFor(() => {
+      expect(screen.getByText(/flaky/i)).toBeInTheDocument()
+    }, { timeout: 3000 })
   })
 
   it('filters suites by search', async () => {

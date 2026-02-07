@@ -1,17 +1,35 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listTests, TestSuite } from '../api'
+import { listTests, listTestRuns, TestSuite } from '../api'
 import styles from './TestsPage.module.css'
+
+interface FlakinessMap {
+  [suiteName: string]: number // percentage 0-100
+}
 
 export function TestsPage() {
   const [suites, setSuites] = useState<TestSuite[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [flakiness, setFlakiness] = useState<FlakinessMap>({})
 
   useEffect(() => {
     listTests()
-      .then(setSuites)
+      .then((loadedSuites) => {
+        setSuites(loadedSuites)
+        // Fetch run history for each suite to compute flakiness
+        loadedSuites.forEach((suite) => {
+          listTestRuns(suite.name).then((runs) => {
+            if (runs.length >= 2) {
+              const statuses = runs.map(r => r.status)
+              const transitions = statuses.slice(1).filter((s, i) => s !== statuses[i]).length
+              const flakyPct = Math.round((transitions / (statuses.length - 1)) * 100)
+              setFlakiness(prev => ({ ...prev, [suite.name]: flakyPct }))
+            }
+          }).catch(() => { /* ignore errors fetching runs */ })
+        })
+      })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
@@ -97,7 +115,14 @@ export function TestsPage() {
               className={styles.card}
             >
               <div className={styles.cardHeader}>
-                <span className={styles.suiteName}>{suite.name}</span>
+                <div className={styles.cardHeaderLeft}>
+                  <span className={styles.suiteName}>{suite.name}</span>
+                  {flakiness[suite.name] !== undefined && flakiness[suite.name] > 20 && (
+                    <span className={styles.flakyBadge} title={`${flakiness[suite.name]}% flakiness rate`}>
+                      Flaky {flakiness[suite.name]}%
+                    </span>
+                  )}
+                </div>
                 <span className={styles.testCount}>{suite.test_count} test{suite.test_count !== 1 ? 's' : ''}</span>
               </div>
               {suite.description && (
