@@ -140,24 +140,26 @@
   color: var(--accent-primary);
 }
 
-.editor {
+.editorContainer {
   flex: 1;
-  width: 100%;
   min-height: 400px;
-  padding: 16px;
-  background: var(--bg-secondary);
-  border: none;
-  outline: none;
-  resize: none;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--text-primary);
-  tab-size: 2;
+  overflow: auto;
 }
 
-.editor::placeholder {
-  color: var(--text-muted);
+.editorContainer :global(.cm-editor) {
+  height: 100%;
+  min-height: 400px;
+}
+
+.editorContainer :global(.cm-scroller) {
+  overflow: auto;
+}
+
+.cmVariable {
+  color: var(--accent-primary);
+  background: rgba(245, 166, 35, 0.1);
+  border-radius: 2px;
+  padding: 0 1px;
 }
 
 /* Sidebar */

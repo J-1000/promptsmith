@@ -1,6 +1,11 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { getPrompt, getPromptVersions, createVersion, Prompt } from '../api'
+import { EditorView, keymap, ViewUpdate, Decoration, DecorationSet, ViewPlugin } from '@codemirror/view'
+import { EditorState, Compartment } from '@codemirror/state'
+import { markdown } from '@codemirror/lang-markdown'
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import styles from './EditorPage.module.css'
 
 function extractVariables(content: string): string[] {
@@ -19,9 +24,88 @@ function extractVariables(content: string): string[] {
 }
 
 function estimateTokens(text: string): number {
-  // Rough estimation: ~4 characters per token for English text
   return Math.ceil(text.length / 4)
 }
+
+// Custom theme matching the dark forge aesthetic
+const forgeTheme = EditorView.theme({
+  '&': {
+    backgroundColor: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '13px',
+  },
+  '.cm-content': {
+    padding: '16px',
+    lineHeight: '1.6',
+    caretColor: 'var(--accent-primary)',
+  },
+  '&.cm-focused .cm-cursor': {
+    borderLeftColor: 'var(--accent-primary)',
+  },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+    backgroundColor: 'rgba(245, 166, 35, 0.15)',
+  },
+  '.cm-activeLine': {
+    backgroundColor: 'rgba(245, 166, 35, 0.05)',
+  },
+  '.cm-gutters': {
+    backgroundColor: 'var(--bg-tertiary)',
+    color: 'var(--text-muted)',
+    border: 'none',
+    borderRight: '1px solid var(--border-subtle)',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: 'rgba(245, 166, 35, 0.08)',
+    color: 'var(--accent-primary)',
+  },
+  '.cm-lineNumbers .cm-gutterElement': {
+    padding: '0 12px 0 8px',
+    minWidth: '40px',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '11px',
+  },
+}, { dark: true })
+
+// Highlight style for markdown
+const forgeHighlightStyle = HighlightStyle.define([
+  { tag: tags.heading, color: 'var(--accent-primary)', fontWeight: '600' },
+  { tag: tags.strong, color: '#e5c07b', fontWeight: '600' },
+  { tag: tags.emphasis, color: '#c678dd', fontStyle: 'italic' },
+  { tag: tags.link, color: '#61afef' },
+  { tag: tags.url, color: '#61afef', textDecoration: 'underline' },
+  { tag: tags.string, color: '#98c379' },
+  { tag: tags.comment, color: 'var(--text-muted)' },
+])
+
+// Plugin for {{variable}} highlighting
+const variableHighlighter = ViewPlugin.fromClass(class {
+  decorations: DecorationSet
+  constructor(view: EditorView) {
+    this.decorations = this.buildDecorations(view)
+  }
+  update(update: ViewUpdate) {
+    if (update.docChanged || update.viewportChanged) {
+      this.decorations = this.buildDecorations(update.view)
+    }
+  }
+  buildDecorations(view: EditorView): DecorationSet {
+    const decorations: { from: number; to: number; decoration: Decoration }[] = []
+    const doc = view.state.doc.toString()
+    const regex = /\{\{\s*\w+\s*\}\}/g
+    let match
+    while ((match = regex.exec(doc)) !== null) {
+      decorations.push({
+        from: match.index,
+        to: match.index + match[0].length,
+        decoration: Decoration.mark({ class: styles.cmVariable }),
+      })
+    }
+    return Decoration.set(decorations.map(d => d.decoration.range(d.from, d.to)))
+  }
+}, {
+  decorations: v => v.decorations,
+})
 
 export function EditorPage() {
   const { name } = useParams<{ name: string }>()
@@ -34,6 +118,9 @@ export function EditorPage() {
   const [saving, setSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [currentVersion, setCurrentVersion] = useState('')
+  const editorRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<EditorView | null>(null)
+  const readOnlyCompartment = useRef(new Compartment())
 
   useEffect(() => {
     if (!name) return
@@ -49,6 +136,48 @@ export function EditorPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [name])
+
+  const onContentChange = useCallback((value: string) => {
+    setContent(value)
+  }, [])
+
+  // Initialize CodeMirror
+  useEffect(() => {
+    if (!editorRef.current || loading || (error && !prompt)) return
+
+    const updateListener = EditorView.updateListener.of((update: ViewUpdate) => {
+      if (update.docChanged) {
+        onContentChange(update.state.doc.toString())
+      }
+    })
+
+    const state = EditorState.create({
+      doc: content,
+      extensions: [
+        forgeTheme,
+        syntaxHighlighting(forgeHighlightStyle),
+        markdown(),
+        variableHighlighter,
+        EditorView.lineWrapping,
+        updateListener,
+        keymap.of([]),
+        readOnlyCompartment.current.of(EditorState.readOnly.of(false)),
+      ],
+    })
+
+    const view = new EditorView({
+      state,
+      parent: editorRef.current,
+    })
+
+    viewRef.current = view
+
+    return () => {
+      view.destroy()
+      viewRef.current = null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, prompt])
 
   const variables = useMemo(() => extractVariables(content), [content])
   const tokens = useMemo(() => estimateTokens(content), [content])
@@ -123,13 +252,7 @@ export function EditorPage() {
               <span className={styles.lineCount}>{content.split('\n').length} lines</span>
             </div>
           </div>
-          <textarea
-            className={styles.editor}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            spellCheck={false}
-            placeholder="Enter your prompt content here..."
-          />
+          <div ref={editorRef} className={styles.editorContainer} data-testid="codemirror-editor" />
         </div>
 
         <div className={styles.sidebar}>

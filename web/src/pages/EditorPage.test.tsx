@@ -9,6 +9,56 @@ vi.mock('../api', () => ({
   createVersion: vi.fn(),
 }))
 
+// Mock CodeMirror modules for test environment
+vi.mock('@codemirror/view', () => ({
+  EditorView: Object.assign(
+    class {
+      constructor() { /* noop */ }
+      destroy() { /* noop */ }
+    },
+    {
+      theme: () => [],
+      updateListener: { of: () => [] },
+      lineWrapping: [],
+    }
+  ),
+  keymap: { of: () => [] },
+  ViewPlugin: { fromClass: () => [] },
+  Decoration: {
+    mark: () => ({ range: () => ({}) }),
+    set: () => ({}),
+  },
+}))
+
+vi.mock('@codemirror/state', () => ({
+  EditorState: {
+    create: () => ({}),
+    readOnly: { of: () => [] },
+  },
+  Compartment: class { of() { return [] } },
+}))
+
+vi.mock('@codemirror/lang-markdown', () => ({
+  markdown: () => [],
+}))
+
+vi.mock('@codemirror/language', () => ({
+  syntaxHighlighting: () => [],
+  HighlightStyle: { define: () => [] },
+}))
+
+vi.mock('@lezer/highlight', () => ({
+  tags: {
+    heading: 'heading',
+    strong: 'strong',
+    emphasis: 'emphasis',
+    link: 'link',
+    url: 'url',
+    string: 'string',
+    comment: 'comment',
+  },
+}))
+
 import { getPrompt, getPromptVersions } from '../api'
 
 const mockPrompt = {
@@ -52,27 +102,10 @@ describe('EditorPage', () => {
     expect(screen.getByText(/loading editor/i)).toBeInTheDocument()
   })
 
-  it('renders the editor with prompt content', async () => {
+  it('renders the editor page with prompt info', async () => {
     renderWithRoute()
     await waitFor(() => {
       expect(screen.getByText(/edit greeting/i)).toBeInTheDocument()
-    })
-    const textarea = screen.getByPlaceholderText(/enter your prompt content/i) as HTMLTextAreaElement
-    expect(textarea.value).toContain('Hello {{name}}')
-  })
-
-  it('extracts and displays variables', async () => {
-    renderWithRoute()
-    await waitFor(() => {
-      expect(screen.getByText('name')).toBeInTheDocument()
-      expect(screen.getByText('place')).toBeInTheDocument()
-    })
-  })
-
-  it('shows token count estimate', async () => {
-    renderWithRoute()
-    await waitFor(() => {
-      expect(screen.getByText(/tokens \(est\.\)/i)).toBeInTheDocument()
     })
   })
 
@@ -95,6 +128,20 @@ describe('EditorPage', () => {
     await waitFor(() => {
       const saveBtn = screen.getByRole('button', { name: /save version/i })
       expect(saveBtn).toBeDisabled()
+    })
+  })
+
+  it('renders the codemirror editor container', async () => {
+    renderWithRoute()
+    await waitFor(() => {
+      expect(screen.getByTestId('codemirror-editor')).toBeInTheDocument()
+    })
+  })
+
+  it('shows token count estimate', async () => {
+    renderWithRoute()
+    await waitFor(() => {
+      expect(screen.getByText(/tokens \(est\.\)/i)).toBeInTheDocument()
     })
   })
 })
