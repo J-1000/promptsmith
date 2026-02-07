@@ -140,6 +140,10 @@ export function BenchmarkResults({ results, onRunBenchmark, isRunning }: Benchma
           )}
         </div>
       )}
+
+      {models.length > 1 && (
+        <RecommendationCards models={models} />
+      )}
     </div>
   )
 }
@@ -183,6 +187,64 @@ function ModelRow({ model, isBestLatency, isBestCost }: ModelRowProps) {
       </td>
     </tr>
   )
+}
+
+function RecommendationCards({ models }: { models: ModelResult[] }) {
+  const valid = models.filter(m => m.errorRate < 1.0)
+  if (valid.length < 2) return null
+
+  const bestOverall = getBestOverall(valid)
+  const bestThroughput = getBestByThroughput(valid)
+  const bestBudget = getBestBudget(valid)
+
+  // Deduplicate — only show distinct picks
+  const cards: { label: string; model: string; reason: string }[] = []
+  if (bestOverall) cards.push({ label: 'Best Overall', model: bestOverall.model, reason: `Balanced score weighing latency, cost, and reliability` })
+  if (bestThroughput && (!bestOverall || bestThroughput.model !== bestOverall.model)) {
+    cards.push({ label: 'Best Throughput', model: bestThroughput.model, reason: `Lowest avg latency at ${formatLatency(bestThroughput.latencyAvgMs)}` })
+  }
+  if (bestBudget && (!bestOverall || bestBudget.model !== bestOverall.model) && (!bestThroughput || bestBudget.model !== bestThroughput.model)) {
+    cards.push({ label: 'Best Budget', model: bestBudget.model, reason: `Lowest cost at ${formatCost(bestBudget.costPerRequest)}/req` })
+  }
+
+  if (cards.length === 0) return null
+
+  return (
+    <div className={styles.recCards}>
+      {cards.map(card => (
+        <div key={card.label} className={styles.recCard}>
+          <span className={styles.recCardLabel}>{card.label}</span>
+          <span className={styles.recCardModel}>{card.model}</span>
+          <span className={styles.recCardReason}>{card.reason}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function getBestOverall(models: ModelResult[]): ModelResult | null {
+  const valid = models.filter(m => m.errorRate < 1.0 && m.latencyP50Ms > 0 && m.costPerRequest > 0)
+  if (valid.length === 0) return null
+  // Normalize each metric 0-1 (lower is better) then pick lowest weighted sum
+  const maxLat = Math.max(...valid.map(m => m.latencyAvgMs))
+  const maxCost = Math.max(...valid.map(m => m.costPerRequest))
+  return valid.reduce((best, m) => {
+    const score = 0.4 * (m.latencyAvgMs / maxLat) + 0.4 * (m.costPerRequest / maxCost) + 0.2 * m.errorRate
+    const bestScore = 0.4 * (best.latencyAvgMs / maxLat) + 0.4 * (best.costPerRequest / maxCost) + 0.2 * best.errorRate
+    return score < bestScore ? m : best
+  })
+}
+
+function getBestByThroughput(models: ModelResult[]): ModelResult | null {
+  const valid = models.filter(m => m.errorRate < 1.0 && m.latencyAvgMs > 0)
+  if (valid.length === 0) return null
+  return valid.reduce((best, m) => m.latencyAvgMs < best.latencyAvgMs ? m : best)
+}
+
+function getBestBudget(models: ModelResult[]): ModelResult | null {
+  const valid = models.filter(m => m.errorRate < 1.0 && m.costPerRequest > 0)
+  if (valid.length === 0) return null
+  return valid.reduce((best, m) => m.costPerRequest < best.costPerRequest ? m : best)
 }
 
 function getBestByLatency(models: ModelResult[]): string | null {

@@ -81,7 +81,8 @@ describe('BenchmarkResults', () => {
     render(<BenchmarkResults results={mockResult} />)
 
     expect(screen.getByText('gpt-4o')).toBeInTheDocument()
-    expect(screen.getByText('gpt-4o-mini')).toBeInTheDocument()
+    // gpt-4o-mini appears in table + recommendation card
+    expect(screen.getAllByText('gpt-4o-mini').length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText('claude-sonnet')).toBeInTheDocument()
   })
 
@@ -163,6 +164,24 @@ describe('BenchmarkResults', () => {
     render(<BenchmarkResults results={mockResult} />)
     expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'CSV' })).toBeInTheDocument()
+  })
+
+  it('shows recommendation cards with best overall', () => {
+    render(<BenchmarkResults results={mockResult} />)
+    expect(screen.getByText('Best Overall')).toBeInTheDocument()
+  })
+
+  it('shows best throughput card when different from overall', () => {
+    const diffResult: BenchmarkResult = {
+      ...mockResult,
+      models: [
+        { ...mockResult.models[0], latencyAvgMs: 100, costPerRequest: 0.05 }, // fast but expensive
+        { ...mockResult.models[1], latencyAvgMs: 500, costPerRequest: 0.001 }, // slow but cheap
+        { ...mockResult.models[2], errors: 0, errorRate: 0, latencyAvgMs: 300, costPerRequest: 0.01 }, // balanced
+      ],
+    }
+    render(<BenchmarkResults results={diffResult} />)
+    expect(screen.getByText('Best Throughput')).toBeInTheDocument()
   })
 
   it('handles all models with errors', () => {
