@@ -947,10 +947,16 @@ func (s *Server) handleBenchmarkByName(w http.ResponseWriter, r *http.Request) {
 
 	benchName := parts[0]
 
-	// Check for /run endpoint
-	if len(parts) >= 2 && parts[1] == "run" {
-		s.runBenchmark(w, r, benchName)
-		return
+	// Check for sub-endpoints
+	if len(parts) >= 2 {
+		switch parts[1] {
+		case "run":
+			s.runBenchmark(w, r, benchName)
+			return
+		case "runs":
+			s.listBenchmarkRuns(w, r, benchName)
+			return
+		}
 	}
 
 	// Get single benchmark suite info
@@ -1031,7 +1037,43 @@ func (s *Server) runBenchmark(w http.ResponseWriter, r *http.Request, benchName 
 		return
 	}
 
+	// Persist run results
+	resultsJSON, _ := json.Marshal(result)
+	s.db.SaveBenchmarkRun(benchName, "", string(resultsJSON))
+
 	writeJSON(w, http.StatusOK, result)
+}
+
+type BenchmarkRunResponse struct {
+	ID          string          `json:"id"`
+	BenchmarkID string          `json:"benchmark_id"`
+	Results     json.RawMessage `json:"results"`
+	CreatedAt   string          `json:"created_at"`
+}
+
+func (s *Server) listBenchmarkRuns(w http.ResponseWriter, r *http.Request, benchName string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	runs, err := s.db.ListBenchmarkRuns(benchName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := make([]BenchmarkRunResponse, 0, len(runs))
+	for _, run := range runs {
+		response = append(response, BenchmarkRunResponse{
+			ID:          run.ID,
+			BenchmarkID: run.BenchmarkID,
+			Results:     json.RawMessage(run.Results),
+			CreatedAt:   run.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 // Generate handlers

@@ -1067,6 +1067,34 @@ func TestDeleteTag(t *testing.T) {
 	}
 }
 
+func TestListBenchmarkRuns(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	database.SaveBenchmarkRun("my-bench", "", `{"models":[]}`)
+	database.SaveBenchmarkRun("my-bench", "", `{"models":[{"model":"gpt-4o"}]}`)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/benchmarks/my-bench/runs", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []BenchmarkRunResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(response) != 2 {
+		t.Errorf("got %d runs, want 2", len(response))
+	}
+}
+
 func TestListTestRuns(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()

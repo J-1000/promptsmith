@@ -237,6 +237,17 @@ export async function runBenchmark(name: string): Promise<BenchmarkResult> {
   return fetchApi<BenchmarkResult>(`/api/benchmarks/${name}/run`, { method: 'POST' });
 }
 
+export interface BenchmarkRunEntry {
+  id: string;
+  benchmark_id: string;
+  results: BenchmarkResult;
+  created_at: string;
+}
+
+export async function listBenchmarkRuns(name: string): Promise<BenchmarkRunEntry[]> {
+  return fetchApi<BenchmarkRunEntry[]>(`/api/benchmarks/${name}/runs`);
+}
+
 // Generate
 
 export interface GenerateVariation {
