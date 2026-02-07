@@ -1067,6 +1067,53 @@ func TestDeleteTag(t *testing.T) {
 	}
 }
 
+func TestCreateBenchmarkSuite(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name": "new-bench", "prompt": "summarizer", "models": ["gpt-4o", "claude-sonnet"], "runs_per_model": 5}`
+	req := httptest.NewRequest("POST", "/api/benchmarks", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response BenchmarkSuiteResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Name != "new-bench" {
+		t.Errorf("name = %q, want %q", response.Name, "new-bench")
+	}
+	if len(response.Models) != 2 {
+		t.Errorf("models count = %d, want 2", len(response.Models))
+	}
+	if response.RunsPerModel != 5 {
+		t.Errorf("runs_per_model = %d, want 5", response.RunsPerModel)
+	}
+
+	// Verify file exists
+	filePath := filepath.Join(tmpDir, "benchmarks", "new-bench.bench.yaml")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Error("benchmark file was not created")
+	}
+
+	// Duplicate should fail
+	req = httptest.NewRequest("POST", "/api/benchmarks", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("duplicate: status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+}
+
 func TestCreateTestSuite(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()

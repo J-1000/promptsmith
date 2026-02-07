@@ -240,6 +240,19 @@ export async function listBenchmarks(): Promise<BenchmarkSuite[]> {
   return fetchApi<BenchmarkSuite[]>('/api/benchmarks');
 }
 
+export async function createBenchmarkSuite(
+  name: string,
+  prompt: string,
+  models?: string[],
+  runsPerModel?: number,
+  description?: string
+): Promise<BenchmarkSuite> {
+  return fetchApi<BenchmarkSuite>('/api/benchmarks', {
+    method: 'POST',
+    body: JSON.stringify({ name, prompt, models, runs_per_model: runsPerModel, description }),
+  });
+}
+
 export async function getBenchmark(name: string): Promise<BenchmarkSuite> {
   return fetchApi<BenchmarkSuite>(`/api/benchmarks/${name}`);
 }

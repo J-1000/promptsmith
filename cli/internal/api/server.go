@@ -982,7 +982,13 @@ func (s *Server) getTestRun(w http.ResponseWriter, r *http.Request, testName str
 // Benchmark handlers
 
 func (s *Server) handleBenchmarks(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		// continue below
+	case http.MethodPost:
+		s.createBenchmarkSuite(w, r)
+		return
+	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
@@ -1018,6 +1024,95 @@ func (s *Server) handleBenchmarks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+type CreateBenchmarkSuiteRequest struct {
+	Name         string   `json:"name"`
+	Prompt       string   `json:"prompt"`
+	Description  string   `json:"description"`
+	Models       []string `json:"models"`
+	RunsPerModel int      `json:"runs_per_model"`
+}
+
+func (s *Server) createBenchmarkSuite(w http.ResponseWriter, r *http.Request) {
+	var req CreateBenchmarkSuiteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if req.Prompt == "" {
+		writeError(w, http.StatusBadRequest, "prompt is required")
+		return
+	}
+
+	// Check prompt exists
+	prompt, err := s.db.GetPromptByName(req.Prompt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", req.Prompt))
+		return
+	}
+
+	// Defaults
+	if len(req.Models) == 0 {
+		req.Models = []string{"gpt-4o-mini"}
+	}
+	if req.RunsPerModel <= 0 {
+		req.RunsPerModel = 3
+	}
+
+	// Write YAML file
+	benchDir := filepath.Join(s.root, "benchmarks")
+	if err := os.MkdirAll(benchDir, 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create benchmarks dir: %v", err))
+		return
+	}
+
+	filePath := filepath.Join(benchDir, req.Name+".bench.yaml")
+
+	if _, err := os.Stat(filePath); err == nil {
+		writeError(w, http.StatusConflict, fmt.Sprintf("benchmark suite '%s' already exists", req.Name))
+		return
+	}
+
+	desc := ""
+	if req.Description != "" {
+		desc = fmt.Sprintf("description: %s\n", req.Description)
+	}
+
+	modelsYAML := ""
+	for _, m := range req.Models {
+		modelsYAML += fmt.Sprintf("  - %s\n", m)
+	}
+
+	content := fmt.Sprintf(`name: %s
+prompt: %s
+%smodels:
+%sruns_per_model: %d
+`, req.Name, req.Prompt, desc, modelsYAML, req.RunsPerModel)
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
+		return
+	}
+
+	relPath, _ := filepath.Rel(s.root, filePath)
+	writeJSON(w, http.StatusCreated, BenchmarkSuiteResponse{
+		Name:         req.Name,
+		FilePath:     relPath,
+		Prompt:       req.Prompt,
+		Description:  req.Description,
+		Models:       req.Models,
+		RunsPerModel: req.RunsPerModel,
+	})
 }
 
 func (s *Server) handleBenchmarkByName(w http.ResponseWriter, r *http.Request) {
