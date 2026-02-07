@@ -15,9 +15,11 @@ vi.mock('../api', () => ({
   runTest: vi.fn(),
   runBenchmark: vi.fn(),
   generateVariations: vi.fn(),
+  listTests: vi.fn(),
+  listBenchmarks: vi.fn(),
 }))
 
-import { getPrompt, getPromptVersions, getPromptDiff, deletePrompt } from '../api'
+import { getPrompt, getPromptVersions, getPromptDiff, deletePrompt, listTests, listBenchmarks } from '../api'
 
 const mockPrompt = {
   id: '1',
@@ -75,6 +77,8 @@ describe('PromptPage', () => {
       v1: { version: '1.0.1', content: mockVersions[1].content },
       v2: { version: '1.0.2', content: mockVersions[0].content },
     })
+    vi.mocked(listTests).mockResolvedValue([])
+    vi.mocked(listBenchmarks).mockResolvedValue([])
   })
 
   it('renders prompt name from URL', async () => {
@@ -234,6 +238,32 @@ describe('PromptPage', () => {
 
     const addTagButtons = screen.getAllByText('+ tag')
     expect(addTagButtons.length).toBeGreaterThan(0)
+  })
+
+  it('shows change impact in diff view', async () => {
+    vi.mocked(listTests).mockResolvedValue([
+      { name: 'greeting-tests', file_path: 'tests/greeting.test.yaml', prompt: 'greeting', test_count: 5 },
+    ])
+    vi.mocked(listBenchmarks).mockResolvedValue([
+      { name: 'greeting-bench', file_path: 'benchmarks/greeting.bench.yaml', prompt: 'greeting', models: [], runs_per_model: 10 },
+    ])
+    const user = userEvent.setup()
+    renderWithRouter('/prompt/greeting')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /history/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /history/i }))
+    await user.click(screen.getByText('Add tone parameter for flexibility'))
+    await user.click(screen.getByText('Fix greeting for edge cases'))
+    await user.click(screen.getByRole('button', { name: /diff/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Change Impact')).toBeInTheDocument()
+      expect(screen.getByText('greeting-tests')).toBeInTheDocument()
+      expect(screen.getByText('greeting-bench')).toBeInTheDocument()
+    })
   })
 
   it('shows remove tag buttons in history view', async () => {

@@ -17,8 +17,12 @@ import {
   runTest,
   runBenchmark,
   generateVariations,
+  listTests,
+  listBenchmarks,
   Prompt,
   Version,
+  TestSuite,
+  BenchmarkSuite,
 } from '../api'
 import styles from './PromptPage.module.css'
 
@@ -54,6 +58,8 @@ export function PromptPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [newTagVersion, setNewTagVersion] = useState<string | null>(null)
   const [newTagName, setNewTagName] = useState('')
+  const [affectedTests, setAffectedTests] = useState<TestSuite[]>([])
+  const [affectedBenchmarks, setAffectedBenchmarks] = useState<BenchmarkSuite[]>([])
 
   const copyToClipboard = async () => {
     if (!currentContent) return
@@ -167,6 +173,12 @@ export function PromptPage() {
       })
       .catch(console.error)
   }, [selectedVersions, name])
+
+  useEffect(() => {
+    if (view !== 'diff' || !name) return
+    listTests().then((suites) => setAffectedTests(suites.filter(s => s.prompt === name))).catch(() => {})
+    listBenchmarks().then((suites) => setAffectedBenchmarks(suites.filter(s => s.prompt === name))).catch(() => {})
+  }, [view, name])
 
   const handleRunTests = async () => {
     if (!name) return
@@ -463,11 +475,34 @@ export function PromptPage() {
         )}
 
         {view === 'diff' && selectedVersions.length === 2 && (
-          <DiffViewer
-            oldVersion={selectedVersions[0]}
-            newVersion={selectedVersions[1]}
-            diff={diffContent}
-          />
+          <>
+            <DiffViewer
+              oldVersion={selectedVersions[0]}
+              newVersion={selectedVersions[1]}
+              diff={diffContent}
+            />
+            {(affectedTests.length > 0 || affectedBenchmarks.length > 0) && (
+              <div className={styles.impactSection}>
+                <h3 className={styles.impactTitle}>Change Impact</h3>
+                <p className={styles.impactHint}>These items use this prompt and may be affected by changes:</p>
+                <div className={styles.impactList}>
+                  {affectedTests.map(t => (
+                    <Link key={t.name} to={`/tests/${t.name}`} className={styles.impactItem}>
+                      <span className={styles.impactIcon}>T</span>
+                      <span>{t.name}</span>
+                      <span className={styles.impactCount}>{t.test_count} tests</span>
+                    </Link>
+                  ))}
+                  {affectedBenchmarks.map(b => (
+                    <Link key={b.name} to={`/benchmarks/${b.name}`} className={styles.impactItem}>
+                      <span className={styles.impactIcon}>B</span>
+                      <span>{b.name}</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {view === 'tests' && (
