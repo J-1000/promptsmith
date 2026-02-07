@@ -497,6 +497,26 @@ func (db *DB) DeleteTag(promptID, name string) error {
 	return nil
 }
 
+func (db *DB) UpdatePrompt(promptID, name, description string) (*Prompt, error) {
+	_, err := db.Exec(
+		"UPDATE prompts SET name = ?, description = ? WHERE id = ?",
+		name, description, promptID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update prompt: %w", err)
+	}
+
+	var p Prompt
+	err = db.QueryRow(
+		"SELECT id, project_id, name, description, file_path, created_at FROM prompts WHERE id = ?",
+		promptID,
+	).Scan(&p.ID, &p.ProjectID, &p.Name, &p.Description, &p.FilePath, &p.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func (db *DB) DeletePrompt(promptID string) error {
 	tx, err := db.Begin()
 	if err != nil {

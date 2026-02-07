@@ -1067,6 +1067,79 @@ func TestDeleteTag(t *testing.T) {
 	}
 }
 
+func TestUpdatePrompt(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Update existing prompt
+	body := `{"name": "summarizer-v2", "description": "Updated description"}`
+	req := httptest.NewRequest("PUT", "/api/prompts/summarizer", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var response PromptResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Name != "summarizer-v2" {
+		t.Errorf("name = %q, want %q", response.Name, "summarizer-v2")
+	}
+	if response.Description != "Updated description" {
+		t.Errorf("description = %q, want %q", response.Description, "Updated description")
+	}
+}
+
+func TestUpdatePromptValidation(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Empty name
+	body := `{"name": ""}`
+	req := httptest.NewRequest("PUT", "/api/prompts/summarizer", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Non-existent prompt
+	body = `{"name": "new-name"}`
+	req = httptest.NewRequest("PUT", "/api/prompts/nonexistent", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	// Name conflict: create another prompt first
+	project, _ := database.GetProject()
+	database.CreatePrompt(project.ID, "other-prompt", "", "prompts/other.prompt")
+
+	body = `{"name": "other-prompt"}`
+	req = httptest.NewRequest("PUT", "/api/prompts/summarizer", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+}
+
 func TestGenerateEndpointDefaults(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()

@@ -294,15 +294,79 @@ func (s *Server) handlePromptByID(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get single prompt or delete
+	// Get, update, or delete single prompt
 	switch r.Method {
 	case http.MethodGet:
 		s.getPrompt(w, r, promptID)
+	case http.MethodPut:
+		s.updatePrompt(w, r, promptID)
 	case http.MethodDelete:
 		s.deletePrompt(w, r, promptID)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+type UpdatePromptRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (s *Server) updatePrompt(w http.ResponseWriter, r *http.Request, promptName string) {
+	prompt, err := s.db.GetPromptByName(promptName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", promptName))
+		return
+	}
+
+	var req UpdatePromptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+
+	// Check for name conflict if renaming
+	if req.Name != prompt.Name {
+		existing, err := s.db.GetPromptByName(req.Name)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if existing != nil {
+			writeError(w, http.StatusConflict, fmt.Sprintf("prompt '%s' already exists", req.Name))
+			return
+		}
+	}
+
+	updated, err := s.db.UpdatePrompt(prompt.ID, req.Name, req.Description)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	latestVersion, _ := s.db.GetLatestVersion(updated.ID)
+	var versionStr string
+	if latestVersion != nil {
+		versionStr = latestVersion.Version
+	}
+
+	writeJSON(w, http.StatusOK, PromptResponse{
+		ID:          updated.ID,
+		Name:        updated.Name,
+		Description: updated.Description,
+		FilePath:    updated.FilePath,
+		Version:     versionStr,
+		CreatedAt:   updated.CreatedAt.Format("2006-01-02T15:04:05Z"),
+	})
 }
 
 func (s *Server) deletePrompt(w http.ResponseWriter, r *http.Request, promptName string) {

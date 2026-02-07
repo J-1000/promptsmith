@@ -154,6 +154,17 @@ export async function createPrompt(
   });
 }
 
+export async function updatePrompt(
+  name: string,
+  newName: string,
+  description: string
+): Promise<Prompt> {
+  return fetchApi<Prompt>(`/api/prompts/${name}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name: newName, description }),
+  });
+}
+
 export async function deletePrompt(name: string): Promise<void> {
   await fetch(`${API_BASE}/api/prompts/${name}`, {
     method: 'DELETE',
