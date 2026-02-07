@@ -302,3 +302,17 @@ export async function generateVariations(request: GenerateRequest): Promise<Gene
     body: JSON.stringify(request),
   });
 }
+
+export async function generateCompression(prompt: string, goal?: string, model?: string): Promise<GenerateResult> {
+  return fetchApi<GenerateResult>('/api/generate/compress', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, goal, model }),
+  });
+}
+
+export async function generateExpansion(prompt: string, goal?: string, model?: string): Promise<GenerateResult> {
+  return fetchApi<GenerateResult>('/api/generate/expand', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, goal, model }),
+  });
+}

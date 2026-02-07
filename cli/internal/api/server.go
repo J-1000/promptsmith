@@ -41,6 +41,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("/api/benchmarks", s.corsMiddleware(s.handleBenchmarks))
 	s.mux.HandleFunc("/api/benchmarks/", s.corsMiddleware(s.handleBenchmarkByName))
 	s.mux.HandleFunc("/api/generate", s.corsMiddleware(s.handleGenerate))
+	s.mux.HandleFunc("/api/generate/", s.corsMiddleware(s.handleGenerateAlias))
 }
 
 func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -1327,4 +1328,48 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleGenerateAlias(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/generate/")
+	typeMap := map[string]string{
+		"variations": "variations",
+		"compress":   "compress",
+		"expand":     "expand",
+		"rephrase":   "rephrase",
+	}
+
+	genType, ok := typeMap[path]
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown generate type: %s", path))
+		return
+	}
+
+	var req GenerateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	req.Type = genType
+
+	body, _ := json.Marshal(req)
+	newReq, _ := http.NewRequest("POST", "/api/generate", strings.NewReader(string(body)))
+	newReq.Header.Set("Content-Type", "application/json")
+
+	s.handleGenerate(w, newReq)
 }

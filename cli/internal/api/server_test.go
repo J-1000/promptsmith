@@ -1350,6 +1350,48 @@ func TestUpdatePromptValidation(t *testing.T) {
 	}
 }
 
+func TestGenerateAliasEndpoints(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Test each alias endpoint parses correctly (they'll fail with no API key, but validate routing)
+	aliases := []string{"variations", "compress", "expand", "rephrase"}
+	for _, alias := range aliases {
+		body := `{"prompt": "Test prompt content"}`
+		req := httptest.NewRequest("POST", "/api/generate/"+alias, strings.NewReader(body))
+		rec := httptest.NewRecorder()
+
+		server.ServeHTTP(rec, req)
+
+		// Should get 500 (no API key) not 404
+		if rec.Code == http.StatusNotFound {
+			t.Errorf("/api/generate/%s returned 404, expected route to exist", alias)
+		}
+	}
+
+	// Unknown type should 404
+	body := `{"prompt": "test"}`
+	req := httptest.NewRequest("POST", "/api/generate/unknown", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("unknown type: status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+
+	// GET should be method not allowed
+	req = httptest.NewRequest("GET", "/api/generate/compress", nil)
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET: status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
 func TestGenerateEndpointDefaults(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
