@@ -9,10 +9,12 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Version Control** — Git-like versioning with semantic versions (`prompt@1.2.3`)
 - **Prompt Parsing** — YAML frontmatter + Mustache templates
 - **Secret Scanning** — Detects API keys and credentials before commit
-- **Testing** — Define test suites with 15+ assertion types
-- **Benchmarking** — Compare prompts across OpenAI and Anthropic models
+- **Testing** — Define test suites with 16+ assertion types, snapshot testing, flaky detection
+- **Benchmarking** — Compare prompts across OpenAI and Anthropic models, result comparison
 - **AI Generation** — Generate variations, compress, or expand prompts with LLMs
 - **Cloud Sync** — Push and pull prompts to/from remote for collaboration
+- **Web Dashboard** — CodeMirror editor, inline diff comments, export reports, recommendation cards
+- **Documentation** — VitePress docs site with CLI, API, and Web UI reference
 
 ## Installation
 
@@ -80,7 +82,9 @@ promptsmith log
 | `promptsmith checkout <prompt> <ref>` | Switch to version or tag |
 | `promptsmith test [files...]` | Run test suites |
 | `promptsmith test --watch` | Watch mode - re-run tests on file changes |
+| `promptsmith test --update-snapshots` | Update snapshot assertions with current output |
 | `promptsmith benchmark [files...]` | Run model benchmarks |
+| `promptsmith benchmark compare <f1> <f2>` | Compare two benchmark result files |
 | `promptsmith generate <prompt>` | Generate prompt variations with AI |
 | `promptsmith config` | View/modify project configuration |
 | `promptsmith serve` | Start API server for web UI integration |
@@ -198,6 +202,7 @@ promptsmith test --live --model gpt-4o  # Use specific model
 | `min_lines` | Minimum line count |
 | `max_lines` | Maximum line count |
 | `word_count` | Exact word count |
+| `snapshot` | Compare against stored `expected_output` |
 
 ## Benchmarking
 
@@ -221,9 +226,10 @@ promptsmith benchmark                              # Run all benchmarks
 promptsmith benchmark --models gpt-4o,claude-sonnet
 promptsmith benchmark --runs 10                    # 10 runs per model
 promptsmith benchmark -o results.json              # Save results
+promptsmith benchmark compare base.json latest.json # Compare results
 ```
 
-Benchmark output shows latency percentiles (p50, p99), token usage, cost per request, and recommendations for best speed/cost models.
+Benchmark output shows latency percentiles (p50, p99), token usage, cost per request, and recommendations for best speed/cost models. The `compare` subcommand shows a color-coded delta table between two result files.
 
 ### Supported Models
 
@@ -293,14 +299,14 @@ npm run dev        # Runs on http://localhost:8081
 
 Features:
 - **Dashboard** — Project stats (prompts, test suites, test cases, benchmarks)
-- **Prompt list** — Version badges, search/filter, prompt cards
-- **Prompt detail** — Tabbed view: content, history, diff, tests, benchmarks, generate
-- **Prompt editor** — Edit prompts in-browser with live variable extraction, token counter, and save as new version
-- **Version history** — Commit messages, tags, side-by-side version comparison
-- **Diff viewer** — Unified diff with syntax highlighting
-- **Tests page** — Browse all test suites, run tests, view pass/fail results
-- **Benchmarks page** — Browse benchmarks, model tags, run and compare results
-- **Settings** — Project info, LLM provider config, sync settings
+- **Prompt list** — Version badges, search/filter, create new prompts
+- **Prompt detail** — Tabbed view: content, history, diff with inline comments, change impact preview
+- **Prompt editor** — CodeMirror 6 with syntax highlighting, `{{variable}}` detection, dark theme
+- **Version history** — Commit messages, tag management (add/remove)
+- **Diff viewer** — Unified diff with per-line comments, change impact preview (affected tests/benchmarks)
+- **Tests page** — Browse test suites, run tests, flaky test detection, export JSON/CSV
+- **Benchmarks page** — Browse benchmarks, run and compare, recommendation cards (best overall/throughput/budget), export JSON/CSV
+- **Settings** — Project info, LLM provider config, team/sync configuration
 - **AI generation** — Generate prompt variations, compress, expand, rephrase
 
 ### API Server
@@ -314,18 +320,34 @@ promptsmith serve --port 3000  # Custom port
 
 **Endpoints:**
 - `GET  /api/project` — Project info
+- `GET  /api/config/sync` — Sync configuration
 - `GET  /api/prompts` — List all prompts
+- `POST /api/prompts` — Create prompt
 - `GET  /api/prompts/:name` — Get prompt details
+- `PUT  /api/prompts/:name` — Update prompt metadata
+- `DELETE /api/prompts/:name` — Delete prompt
 - `GET  /api/prompts/:name/versions` — List versions
 - `POST /api/prompts/:name/versions` — Create new version
 - `GET  /api/prompts/:name/diff?v1=X&v2=Y` — Version diff
+- `POST /api/prompts/:name/tags` — Create tag
+- `DELETE /api/prompts/:name/tags/:tag` — Delete tag
+- `GET  /api/prompts/:name/comments` — List inline comments
+- `POST /api/prompts/:name/comments` — Create comment
+- `DELETE /api/comments/:id` — Delete comment
 - `GET  /api/tests` — List test suites
+- `POST /api/tests` — Create test suite
 - `GET  /api/tests/:name` — Get test suite
 - `POST /api/tests/:name/run` — Run test suite
+- `GET  /api/tests/:name/runs` — Test run history
+- `GET  /api/tests/:name/runs/:runId` — Get test run
 - `GET  /api/benchmarks` — List benchmarks
+- `POST /api/benchmarks` — Create benchmark suite
 - `GET  /api/benchmarks/:name` — Get benchmark
 - `POST /api/benchmarks/:name/run` — Run benchmark
+- `GET  /api/benchmarks/:name/runs` — Benchmark run history
 - `POST /api/generate` — Generate prompt variations
+- `POST /api/generate/compress` — Compress prompt
+- `POST /api/generate/expand` — Expand prompt
 
 ## Cloud Sync
 
@@ -376,6 +398,19 @@ promptsmith config sync.auto_push true
 promptsmith config sync.team my-team
 ```
 
+## Documentation
+
+Full documentation is available in the `docs/` directory, powered by VitePress:
+
+```bash
+cd docs
+npm install
+npm run docs:dev     # Dev server
+npm run docs:build   # Production build
+```
+
+Pages: [Getting Started](docs/getting-started.md) | [CLI Reference](docs/cli-reference.md) | [Web UI](docs/web-ui.md) | [API Reference](docs/api-reference.md) | [Contributing](docs/contributing.md)
+
 ## Roadmap
 
 - [x] **Phase 1**: CLI foundation, versioning, parsing
@@ -384,6 +419,8 @@ promptsmith config sync.team my-team
 - [x] **Phase 4**: Multi-model benchmarking, AI generation, live testing
 - [x] **Phase 5**: Cloud sync, collaboration
 - [x] **Phase 6**: Full web UI — editor, tests, benchmarks, settings, dashboard
+- [x] **Phase 7**: CRUD completion, tag management, confirmations
+- [x] **Phase 8**: CodeMirror editor, inline comments, snapshot testing, benchmark compare, flaky detection, export reports, VitePress docs
 
 ## License
 

@@ -1,12 +1,12 @@
 PromptSmith Development Progress
 ================================
 
-Summary (Phase 7 complete):
-  - 7 phases complete
+Summary (Phase 8 complete):
+  - 8 phases complete
   - Go CLI: 20+ commands, 10 packages, all tests passing
-  - Web UI: 16 test files, 153 tests passing, 10 pages
-  - API: 16 endpoints (full CRUD)
-  - Docs: LICENSE (MIT), CONTRIBUTING.md
+  - Web UI: 16 test files, 160+ tests passing, 10 pages
+  - API: 25+ endpoints (full CRUD + history + comments)
+  - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
 Phase 1: Foundation — CLI Only [COMPLETE]
 -----------------------------------------
@@ -359,6 +359,67 @@ API endpoints added:
   - DELETE /api/prompts/:name        Delete a prompt
   - POST   /api/prompts/:name/tags   Create a tag
   - DELETE /api/prompts/:name/tags/:tagName  Delete a tag
+
+
+Phase 8: Feature Completion + Docs [COMPLETE]
+----------------------------------------------
+  [x] PUT /api/prompts/:name — update prompt metadata
+  [x] DB layer for test runs & benchmark runs (SaveTestRun, ListTestRuns, etc.)
+  [x] Test run history API (GET /api/tests/:name/runs, /runs/:runId)
+  [x] Benchmark run history API (GET /api/benchmarks/:name/runs)
+  [x] POST /api/tests — create test suite (writes YAML file)
+  [x] POST /api/benchmarks — create benchmark suite (writes YAML file)
+  [x] Separate generate endpoints (/api/generate/compress, /expand, /variations)
+  [x] CodeMirror 6 editor (syntax highlighting, {{var}} detection, dark theme)
+  [x] Export reports (JSON/CSV) for benchmark and test results
+  [x] Flaky test detection on TestsPage (warning badge when flakiness > 20%)
+  [x] Enhanced model recommendation (best overall, throughput, budget cards)
+  [x] Team/sync section in SettingsPage (reads .promptsmith/config.yaml)
+  [x] Change impact preview in PromptPage diff tab (affected tests & benchmarks)
+  [x] Inline diff comments (per-line add/delete, DB-backed)
+  [x] CLI: benchmark compare subcommand (delta table, color-coded)
+  [x] CLI: --update-snapshots flag + snapshot assertion type
+  [x] VitePress documentation site (5 pages: getting started, CLI, web UI, API, contributing)
+
+New/modified files:
+  cli/cmd/benchmark.go              benchmark compare subcommand
+  cli/cmd/test.go                   --update-snapshots flag
+  cli/internal/testing/suite.go     snapshot assertion, ExpectedOutput, UpdateSnapshot()
+  cli/internal/testing/assertions.go  snapshot evaluation
+  cli/internal/testing/runner.go    snapshot update support
+  cli/internal/db/db.go             comments table, test_runs/benchmark_runs CRUD
+  cli/internal/api/server.go        9 new endpoints (update, history, comments, create suites, generate aliases)
+  web/src/api.ts                    15 new API client functions
+  web/src/pages/EditorPage.tsx      CodeMirror 6 integration
+  web/src/pages/TestsPage.tsx       Flaky test detection
+  web/src/pages/PromptPage.tsx      Change impact preview, diff comments
+  web/src/pages/SettingsPage.tsx    Team/sync config section
+  web/src/components/DiffViewer.tsx  Inline comments (add/delete)
+  web/src/components/BenchmarkResults.tsx  Recommendation cards, CSV/JSON export
+  web/src/components/TestResults.tsx  CSV/JSON export
+  docs/                             VitePress docs site (7 files)
+
+New API endpoints:
+  PUT    /api/prompts/:name            Update prompt metadata
+  GET    /api/tests/:name/runs         List test run history
+  GET    /api/tests/:name/runs/:runId  Get specific test run
+  GET    /api/benchmarks/:name/runs    List benchmark run history
+  POST   /api/tests                    Create test suite
+  POST   /api/benchmarks               Create benchmark suite
+  POST   /api/generate/compress        Compress prompt
+  POST   /api/generate/expand          Expand prompt
+  POST   /api/generate/variations      Generate variations
+  GET    /api/prompts/:name/comments   List comments
+  POST   /api/prompts/:name/comments   Create comment
+  DELETE /api/comments/:id             Delete comment
+  GET    /api/config/sync              Get sync configuration
+
+New CLI features:
+  promptsmith benchmark compare <f1> <f2>   Compare benchmark results
+  promptsmith test --update-snapshots       Update snapshot assertions
+
+New assertion type:
+  snapshot — compare output against stored expected_output
 
 
 Build & Test
