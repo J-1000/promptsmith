@@ -689,7 +689,13 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request, promptID str
 // Test handlers
 
 func (s *Server) handleTests(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
+		// continue below
+	case http.MethodPost:
+		s.createTestSuite(w, r)
+		return
+	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
@@ -831,6 +837,84 @@ func (s *Server) runTest(w http.ResponseWriter, r *http.Request, testName string
 	s.db.SaveTestRun(testName, "", status, string(resultsJSON))
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+type CreateTestSuiteRequest struct {
+	Name        string `json:"name"`
+	Prompt      string `json:"prompt"`
+	Description string `json:"description"`
+}
+
+func (s *Server) createTestSuite(w http.ResponseWriter, r *http.Request) {
+	var req CreateTestSuiteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if req.Prompt == "" {
+		writeError(w, http.StatusBadRequest, "prompt is required")
+		return
+	}
+
+	// Check prompt exists
+	prompt, err := s.db.GetPromptByName(req.Prompt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", req.Prompt))
+		return
+	}
+
+	// Write YAML file
+	testsDir := filepath.Join(s.root, "tests")
+	if err := os.MkdirAll(testsDir, 0755); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create tests dir: %v", err))
+		return
+	}
+
+	filePath := filepath.Join(testsDir, req.Name+".test.yaml")
+
+	// Check for existing file
+	if _, err := os.Stat(filePath); err == nil {
+		writeError(w, http.StatusConflict, fmt.Sprintf("test suite '%s' already exists", req.Name))
+		return
+	}
+
+	desc := ""
+	if req.Description != "" {
+		desc = fmt.Sprintf("description: %s\n", req.Description)
+	}
+
+	content := fmt.Sprintf(`name: %s
+prompt: %s
+%stests:
+  - name: example-test
+    inputs:
+      text: "hello"
+    assertions:
+      - type: not_empty
+`, req.Name, req.Prompt, desc)
+
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
+		return
+	}
+
+	relPath, _ := filepath.Rel(s.root, filePath)
+	writeJSON(w, http.StatusCreated, TestSuiteResponse{
+		Name:        req.Name,
+		FilePath:    relPath,
+		Prompt:      req.Prompt,
+		Description: req.Description,
+		TestCount:   1,
+	})
 }
 
 type TestRunResponse struct {

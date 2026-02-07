@@ -199,6 +199,17 @@ export async function listTests(): Promise<TestSuite[]> {
   return fetchApi<TestSuite[]>('/api/tests');
 }
 
+export async function createTestSuite(
+  name: string,
+  prompt: string,
+  description?: string
+): Promise<TestSuite> {
+  return fetchApi<TestSuite>('/api/tests', {
+    method: 'POST',
+    body: JSON.stringify({ name, prompt, description }),
+  });
+}
+
 export async function getTest(name: string): Promise<TestSuite> {
   return fetchApi<TestSuite>(`/api/tests/${name}`);
 }

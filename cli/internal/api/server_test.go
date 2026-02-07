@@ -1067,6 +1067,71 @@ func TestDeleteTag(t *testing.T) {
 	}
 }
 
+func TestCreateTestSuite(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	// Create test suite
+	body := `{"name": "new-test", "prompt": "summarizer", "description": "My test suite"}`
+	req := httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	var response TestSuiteResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.Name != "new-test" {
+		t.Errorf("name = %q, want %q", response.Name, "new-test")
+	}
+	if response.Prompt != "summarizer" {
+		t.Errorf("prompt = %q, want %q", response.Prompt, "summarizer")
+	}
+
+	// Verify file was written
+	filePath := filepath.Join(tmpDir, "tests", "new-test.test.yaml")
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		t.Error("test file was not created")
+	}
+
+	// Duplicate should fail
+	req = httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("duplicate: status = %d, want %d", rec.Code, http.StatusConflict)
+	}
+
+	// Missing name
+	body = `{"prompt": "summarizer"}`
+	req = httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("missing name: status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	// Non-existent prompt
+	body = `{"name": "test2", "prompt": "nonexistent"}`
+	req = httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec = httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("bad prompt: status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestListBenchmarkRuns(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
