@@ -737,10 +737,20 @@ func (s *Server) handleTestByName(w http.ResponseWriter, r *http.Request) {
 
 	testName := parts[0]
 
-	// Check for /run endpoint
-	if len(parts) >= 2 && parts[1] == "run" {
-		s.runTest(w, r, testName)
-		return
+	// Check for sub-endpoints
+	if len(parts) >= 2 {
+		switch parts[1] {
+		case "run":
+			s.runTest(w, r, testName)
+			return
+		case "runs":
+			if len(parts) >= 3 && parts[2] != "" {
+				s.getTestRun(w, r, testName, parts[2])
+			} else {
+				s.listTestRuns(w, r, testName)
+			}
+			return
+		}
 	}
 
 	// Get single test suite info
@@ -812,7 +822,77 @@ func (s *Server) runTest(w http.ResponseWriter, r *http.Request, testName string
 		return
 	}
 
+	// Persist run results
+	status := "passed"
+	if result.Failed > 0 {
+		status = "failed"
+	}
+	resultsJSON, _ := json.Marshal(result)
+	s.db.SaveTestRun(testName, "", status, string(resultsJSON))
+
 	writeJSON(w, http.StatusOK, result)
+}
+
+type TestRunResponse struct {
+	ID          string          `json:"id"`
+	SuiteID     string          `json:"suite_id"`
+	Status      string          `json:"status"`
+	Results     json.RawMessage `json:"results"`
+	StartedAt   string          `json:"started_at"`
+	CompletedAt string          `json:"completed_at"`
+}
+
+func (s *Server) listTestRuns(w http.ResponseWriter, r *http.Request, testName string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	runs, err := s.db.ListTestRuns(testName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response := make([]TestRunResponse, 0, len(runs))
+	for _, run := range runs {
+		response = append(response, TestRunResponse{
+			ID:          run.ID,
+			SuiteID:     run.SuiteID,
+			Status:      run.Status,
+			Results:     json.RawMessage(run.Results),
+			StartedAt:   run.StartedAt.Format("2006-01-02T15:04:05Z"),
+			CompletedAt: run.CompletedAt.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) getTestRun(w http.ResponseWriter, r *http.Request, testName string, runID string) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	run, err := s.db.GetTestRun(runID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if run == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("test run '%s' not found", runID))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, TestRunResponse{
+		ID:          run.ID,
+		SuiteID:     run.SuiteID,
+		Status:      run.Status,
+		Results:     json.RawMessage(run.Results),
+		StartedAt:   run.StartedAt.Format("2006-01-02T15:04:05Z"),
+		CompletedAt: run.CompletedAt.Format("2006-01-02T15:04:05Z"),
+	})
 }
 
 // Benchmark handlers

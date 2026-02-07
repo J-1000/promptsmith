@@ -207,6 +207,23 @@ export async function runTest(name: string): Promise<SuiteResult> {
   return fetchApi<SuiteResult>(`/api/tests/${name}/run`, { method: 'POST' });
 }
 
+export interface TestRunEntry {
+  id: string;
+  suite_id: string;
+  status: string;
+  results: SuiteResult;
+  started_at: string;
+  completed_at: string;
+}
+
+export async function listTestRuns(name: string): Promise<TestRunEntry[]> {
+  return fetchApi<TestRunEntry[]>(`/api/tests/${name}/runs`);
+}
+
+export async function getTestRun(name: string, runId: string): Promise<TestRunEntry> {
+  return fetchApi<TestRunEntry>(`/api/tests/${name}/runs/${runId}`);
+}
+
 // Benchmarks
 export async function listBenchmarks(): Promise<BenchmarkSuite[]> {
   return fetchApi<BenchmarkSuite[]>('/api/benchmarks');

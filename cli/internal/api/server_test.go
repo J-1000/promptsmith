@@ -1067,6 +1067,76 @@ func TestDeleteTag(t *testing.T) {
 	}
 }
 
+func TestListTestRuns(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Save some test runs
+	database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`)
+	database.SaveTestRun("my-suite", "", "failed", `{"failed":1}`)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/tests/my-suite/runs", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []TestRunResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(response) != 2 {
+		t.Errorf("got %d runs, want 2", len(response))
+	}
+}
+
+func TestGetTestRun(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	run, _ := database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`)
+
+	server := NewServer(database, tmpDir)
+
+	// Get existing run
+	req := httptest.NewRequest("GET", "/api/tests/my-suite/runs/"+run.ID, nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response TestRunResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if response.ID != run.ID {
+		t.Errorf("id = %q, want %q", response.ID, run.ID)
+	}
+	if response.Status != "passed" {
+		t.Errorf("status = %q, want %q", response.Status, "passed")
+	}
+
+	// Get non-existent run
+	req = httptest.NewRequest("GET", "/api/tests/my-suite/runs/nonexistent", nil)
+	rec = httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestUpdatePrompt(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
