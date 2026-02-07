@@ -1411,3 +1411,60 @@ func TestGenerateEndpointDefaults(t *testing.T) {
 		t.Errorf("status = %d, want %d (expected provider error without API key)", rec.Code, http.StatusInternalServerError)
 	}
 }
+
+func TestSyncConfigNotConfigured(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/config/sync", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp SyncConfigResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Status != "not_configured" {
+		t.Errorf("status = %q, want %q", resp.Status, "not_configured")
+	}
+}
+
+func TestSyncConfigConfigured(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Write config file
+	configDir := filepath.Join(tmpDir, ".promptsmith")
+	os.MkdirAll(configDir, 0o755)
+	configContent := "team: acme-team\nremote: https://sync.example.com\nauto_push: true\n"
+	os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(configContent), 0o644)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/config/sync", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var resp SyncConfigResponse
+	json.NewDecoder(rec.Body).Decode(&resp)
+	if resp.Status != "configured" {
+		t.Errorf("status = %q, want %q", resp.Status, "configured")
+	}
+	if resp.Team != "acme-team" {
+		t.Errorf("team = %q, want %q", resp.Team, "acme-team")
+	}
+	if resp.Remote != "https://sync.example.com" {
+		t.Errorf("remote = %q, want %q", resp.Remote, "https://sync.example.com")
+	}
+	if !resp.AutoPush {
+		t.Error("auto_push = false, want true")
+	}
+}

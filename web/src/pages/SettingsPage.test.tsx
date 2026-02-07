@@ -5,9 +5,10 @@ import { SettingsPage } from './SettingsPage'
 
 vi.mock('../api', () => ({
   getProject: vi.fn(),
+  getSyncConfig: vi.fn(),
 }))
 
-import { getProject } from '../api'
+import { getProject, getSyncConfig } from '../api'
 
 function renderWithRouter(ui: React.ReactElement) {
   return render(<BrowserRouter>{ui}</BrowserRouter>)
@@ -16,6 +17,7 @@ function renderWithRouter(ui: React.ReactElement) {
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.mocked(getProject).mockResolvedValue({ id: 'proj_123', name: 'my-project' })
+    vi.mocked(getSyncConfig).mockResolvedValue({ team: '', remote: '', auto_push: false, status: 'not_configured' })
   })
 
   it('renders the page title', async () => {
@@ -62,6 +64,28 @@ describe('SettingsPage', () => {
     renderWithRouter(<SettingsPage />)
     await waitFor(() => {
       expect(screen.getByText(/the github copilot for prompt engineering/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows sync team info when configured', async () => {
+    vi.mocked(getSyncConfig).mockResolvedValue({
+      team: 'acme-team',
+      remote: 'https://sync.promptsmith.dev',
+      auto_push: true,
+      status: 'configured',
+    })
+    renderWithRouter(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByText('acme-team')).toBeInTheDocument()
+      expect(screen.getByText('https://sync.promptsmith.dev')).toBeInTheDocument()
+      expect(screen.getByText('Connected')).toBeInTheDocument()
+    })
+  })
+
+  it('shows CLI commands when sync not configured', async () => {
+    renderWithRouter(<SettingsPage />)
+    await waitFor(() => {
+      expect(screen.getByText(/configure cloud sync/i)).toBeInTheDocument()
     })
   })
 

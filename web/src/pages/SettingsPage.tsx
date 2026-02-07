@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getProject, Project } from '../api'
+import { getProject, getSyncConfig, Project, SyncConfig } from '../api'
 import styles from './SettingsPage.module.css'
 
 interface ProviderConfig {
@@ -16,14 +16,15 @@ const PROVIDERS: ProviderConfig[] = [
 
 export function SettingsPage() {
   const [project, setProject] = useState<Project | null>(null)
+  const [syncConfig, setSyncConfig] = useState<SyncConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getProject()
-      .then(setProject)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+    Promise.all([
+      getProject().then(setProject).catch((err) => setError(err.message)),
+      getSyncConfig().then(setSyncConfig).catch(() => {}),
+    ]).finally(() => setLoading(false))
   }, [])
 
   if (loading) {
@@ -86,27 +87,58 @@ export function SettingsPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Sync</h2>
         <div className={styles.card}>
-          <p className={styles.sectionHint}>
-            Configure cloud sync with the CLI:
-          </p>
-          <div className={styles.cliCommands}>
-            <div className={styles.cliCommand}>
-              <code>promptsmith config sync.remote &lt;url&gt;</code>
-              <span className={styles.cliDesc}>Set remote server URL</span>
-            </div>
-            <div className={styles.cliCommand}>
-              <code>promptsmith config sync.team &lt;team&gt;</code>
-              <span className={styles.cliDesc}>Set team for collaboration</span>
-            </div>
-            <div className={styles.cliCommand}>
-              <code>promptsmith config sync.auto_push true</code>
-              <span className={styles.cliDesc}>Auto-push on commit</span>
-            </div>
-            <div className={styles.cliCommand}>
-              <code>promptsmith login</code>
-              <span className={styles.cliDesc}>Authenticate with cloud</span>
-            </div>
-          </div>
+          {syncConfig && syncConfig.status === 'configured' ? (
+            <>
+              <div className={styles.fieldGroup}>
+                {syncConfig.team && (
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel}>Team</label>
+                    <span className={styles.fieldValue}>{syncConfig.team}</span>
+                  </div>
+                )}
+                {syncConfig.remote && (
+                  <div className={styles.field}>
+                    <label className={styles.fieldLabel}>Remote</label>
+                    <code className={styles.fieldCode}>{syncConfig.remote}</code>
+                  </div>
+                )}
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Auto-push</label>
+                  <span className={styles.statusBadge} data-status={syncConfig.auto_push ? 'configured' : 'not_configured'}>
+                    {syncConfig.auto_push ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Status</label>
+                  <span className={styles.statusBadge} data-status="configured">Connected</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className={styles.sectionHint}>
+                Configure cloud sync with the CLI:
+              </p>
+              <div className={styles.cliCommands}>
+                <div className={styles.cliCommand}>
+                  <code>promptsmith config sync.remote &lt;url&gt;</code>
+                  <span className={styles.cliDesc}>Set remote server URL</span>
+                </div>
+                <div className={styles.cliCommand}>
+                  <code>promptsmith config sync.team &lt;team&gt;</code>
+                  <span className={styles.cliDesc}>Set team for collaboration</span>
+                </div>
+                <div className={styles.cliCommand}>
+                  <code>promptsmith config sync.auto_push true</code>
+                  <span className={styles.cliDesc}>Auto-push on commit</span>
+                </div>
+                <div className={styles.cliCommand}>
+                  <code>promptsmith login</code>
+                  <span className={styles.cliDesc}>Authenticate with cloud</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </section>
 

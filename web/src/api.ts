@@ -111,6 +111,18 @@ export async function getProject(): Promise<Project> {
   return fetchApi<Project>('/api/project');
 }
 
+// Sync config
+export interface SyncConfig {
+  team: string;
+  remote: string;
+  auto_push: boolean;
+  status: 'configured' | 'not_configured';
+}
+
+export async function getSyncConfig(): Promise<SyncConfig> {
+  return fetchApi<SyncConfig>('/api/config/sync');
+}
+
 // Prompts
 export async function listPrompts(): Promise<Prompt[]> {
   return fetchApi<Prompt[]>('/api/prompts');
