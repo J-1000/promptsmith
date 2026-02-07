@@ -1,6 +1,9 @@
 package testing
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -247,5 +250,92 @@ tests:
 	}
 	if len(tc.Tags) != 2 || tc.Tags[0] != "tag1" || tc.Tags[1] != "tag2" {
 		t.Errorf("expected tags [tag1, tag2], got %v", tc.Tags)
+	}
+}
+
+func TestParseSnapshotAssertion(t *testing.T) {
+	yaml := `
+name: snapshot-suite
+prompt: my-prompt
+tests:
+  - name: snap-test
+    inputs:
+      key: value
+    expected_output: "hello world"
+    assertions:
+      - type: snapshot
+`
+	suite, err := ParseSuite([]byte(yaml))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	tc := suite.Tests[0]
+	if tc.ExpectedOutput != "hello world" {
+		t.Errorf("expected expected_output 'hello world', got %q", tc.ExpectedOutput)
+	}
+	if tc.Assertions[0].Type != AssertSnapshot {
+		t.Errorf("expected assertion type 'snapshot', got %q", tc.Assertions[0].Type)
+	}
+}
+
+func TestUpdateSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.test.yaml")
+
+	initial := `name: snapshot-suite
+prompt: my-prompt
+tests:
+  - name: snap-test
+    inputs:
+      key: value
+    assertions:
+      - type: snapshot
+`
+	os.WriteFile(path, []byte(initial), 0644)
+
+	err := UpdateSnapshot(path, "snap-test", "new output here")
+	if err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	content := string(data)
+	if !strings.Contains(content, "expected_output") {
+		t.Error("expected expected_output field to be added")
+	}
+	if !strings.Contains(content, "new output here") {
+		t.Errorf("expected snapshot content 'new output here' in file, got:\n%s", content)
+	}
+}
+
+func TestUpdateSnapshotOverwrite(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "test.test.yaml")
+
+	initial := `name: snapshot-suite
+prompt: my-prompt
+tests:
+  - name: snap-test
+    inputs:
+      key: value
+    expected_output: old output
+    assertions:
+      - type: snapshot
+`
+	os.WriteFile(path, []byte(initial), 0644)
+
+	err := UpdateSnapshot(path, "snap-test", "updated output")
+	if err != nil {
+		t.Fatalf("UpdateSnapshot failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(path)
+	content := string(data)
+	if strings.Contains(content, "old output") {
+		t.Error("expected old snapshot to be replaced")
+	}
+	if !strings.Contains(content, "updated output") {
+		t.Errorf("expected 'updated output' in file, got:\n%s", content)
 	}
 }

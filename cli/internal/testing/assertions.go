@@ -159,6 +159,24 @@ func (a *Assertion) Evaluate(output string) AssertionResult {
 			result.Message = fmt.Sprintf("expected %d words, got %d", expected, actual)
 		}
 
+	case AssertSnapshot:
+		// Snapshot comparison is handled by the runner which passes
+		// the expected_output as a.Value before calling Evaluate
+		expected := toString(a.Value)
+		if expected == "" {
+			result.Passed = false
+			result.Expected = "(no snapshot stored)"
+			result.Actual = truncate(output, 100)
+			result.Message = "no snapshot stored; run with --update-snapshots to create one"
+			return result
+		}
+		result.Passed = strings.TrimSpace(output) == strings.TrimSpace(expected)
+		result.Expected = truncate(expected, 100)
+		result.Actual = truncate(output, 100)
+		if !result.Passed && result.Message == "" {
+			result.Message = "output does not match snapshot; run with --update-snapshots to update"
+		}
+
 	case AssertSentiment, AssertLanguage:
 		// These require LLM evaluation - mark as passed for now
 		// Will be implemented when LLM integration is added

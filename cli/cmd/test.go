@@ -17,12 +17,13 @@ import (
 )
 
 var (
-	testFilter  string
-	testVersion string
-	testOutput  string
-	testLive    bool
-	testModel   string
-	testWatch   bool
+	testFilter          string
+	testVersion         string
+	testOutput          string
+	testLive            bool
+	testModel           string
+	testWatch           bool
+	testUpdateSnapshots bool
 )
 
 var testCmd = &cobra.Command{
@@ -43,7 +44,8 @@ Examples:
   promptsmith test --version 1.0.0           # Test specific prompt version
   promptsmith test --live                    # Run with real LLM
   promptsmith test --live --model gpt-4o     # Use specific model
-  promptsmith test --watch                   # Re-run tests on file changes`,
+  promptsmith test --watch                   # Re-run tests on file changes
+  promptsmith test --update-snapshots        # Update snapshot assertions`,
 	RunE: runTest,
 }
 
@@ -54,6 +56,7 @@ func init() {
 	testCmd.Flags().BoolVar(&testLive, "live", false, "run tests against real LLMs (requires API keys)")
 	testCmd.Flags().StringVarP(&testModel, "model", "m", "gpt-4o-mini", "model to use for live testing")
 	testCmd.Flags().BoolVarP(&testWatch, "watch", "w", false, "watch for file changes and re-run tests")
+	testCmd.Flags().BoolVar(&testUpdateSnapshots, "update-snapshots", false, "update snapshot assertions with current output")
 	rootCmd.AddCommand(testCmd)
 }
 
@@ -130,6 +133,7 @@ func executeTests(ctx *testRunContext) (passed, failed, skipped int, results []*
 	dim := color.New(color.Faint).SprintFunc()
 
 	runner := testing.NewRunner(ctx.database, ctx.executor)
+	runner.UpdateSnapshots = testUpdateSnapshots
 
 	for _, file := range ctx.suiteFiles {
 		suite, err := testing.ParseSuiteFile(file)

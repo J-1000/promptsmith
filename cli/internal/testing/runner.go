@@ -12,8 +12,9 @@ import (
 
 // Runner executes test suites against prompts
 type Runner struct {
-	db       *db.DB
-	executor OutputExecutor
+	db              *db.DB
+	executor        OutputExecutor
+	UpdateSnapshots bool
 }
 
 // OutputExecutor generates output for a rendered prompt
@@ -96,7 +97,7 @@ func (r *Runner) Run(suite *TestSuite) (*SuiteResult, error) {
 
 	// Run each test
 	for _, tc := range suite.Tests {
-		testResult := r.runTest(tc, parsed)
+		testResult := r.runTest(tc, parsed, suite.FilePath)
 		result.Results = append(result.Results, testResult)
 
 		if testResult.Skipped {
@@ -113,7 +114,7 @@ func (r *Runner) Run(suite *TestSuite) (*SuiteResult, error) {
 	return result, nil
 }
 
-func (r *Runner) runTest(tc TestCase, parsed *prompt.ParsedPrompt) TestResult {
+func (r *Runner) runTest(tc TestCase, parsed *prompt.ParsedPrompt, suiteFile string) TestResult {
 	testStart := time.Now()
 	result := TestResult{
 		TestName: tc.Name,
@@ -146,6 +147,20 @@ func (r *Runner) runTest(tc TestCase, parsed *prompt.ParsedPrompt) TestResult {
 	// Run assertions
 	result.Passed = true
 	for _, assertion := range tc.Assertions {
+		// For snapshot assertions, inject the expected_output as the value
+		if assertion.Type == AssertSnapshot {
+			if r.UpdateSnapshots && suiteFile != "" {
+				// Update mode: store current output as the new snapshot
+				if err := UpdateSnapshot(suiteFile, tc.Name, output); err != nil {
+					result.Error = fmt.Sprintf("failed to update snapshot: %s", err)
+					result.DurationMs = time.Since(testStart).Milliseconds()
+					return result
+				}
+				// Mark as passed since we just updated
+				continue
+			}
+			assertion.Value = tc.ExpectedOutput
+		}
 		ar := assertion.Evaluate(output)
 		if !ar.Passed {
 			result.Passed = false

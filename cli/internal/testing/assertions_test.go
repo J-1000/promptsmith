@@ -236,6 +236,31 @@ func TestAssertionEvaluate(t *testing.T) {
 			output:     "one two three",
 			wantPassed: false,
 		},
+		// Snapshot
+		{
+			name:       "snapshot - pass",
+			assertion:  Assertion{Type: AssertSnapshot, Value: "hello world"},
+			output:     "hello world",
+			wantPassed: true,
+		},
+		{
+			name:       "snapshot - fail mismatch",
+			assertion:  Assertion{Type: AssertSnapshot, Value: "expected output"},
+			output:     "actual output",
+			wantPassed: false,
+		},
+		{
+			name:       "snapshot - no stored snapshot",
+			assertion:  Assertion{Type: AssertSnapshot, Value: ""},
+			output:     "some output",
+			wantPassed: false,
+		},
+		{
+			name:       "snapshot - pass with whitespace trimming",
+			assertion:  Assertion{Type: AssertSnapshot, Value: "hello"},
+			output:     "  hello  ",
+			wantPassed: true,
+		},
 	}
 
 	for _, tt := range tests {

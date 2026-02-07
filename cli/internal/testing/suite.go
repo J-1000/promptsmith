@@ -14,15 +14,17 @@ type TestSuite struct {
 	Description string     `yaml:"description,omitempty" json:"description,omitempty"`
 	Version     string     `yaml:"version,omitempty" json:"version,omitempty"` // Optional: pin to specific version
 	Tests       []TestCase `yaml:"tests" json:"tests"`
+	FilePath    string     `yaml:"-" json:"-"` // Set by ParseSuiteFile, not serialized
 }
 
 // TestCase defines a single test with inputs and assertions
 type TestCase struct {
-	Name       string            `yaml:"name" json:"name"`
-	Inputs     map[string]any    `yaml:"inputs" json:"inputs"`
-	Assertions []Assertion       `yaml:"assertions" json:"assertions"`
-	Skip       bool              `yaml:"skip,omitempty" json:"skip,omitempty"`
-	Tags       []string          `yaml:"tags,omitempty" json:"tags,omitempty"`
+	Name           string            `yaml:"name" json:"name"`
+	Inputs         map[string]any    `yaml:"inputs" json:"inputs"`
+	Assertions     []Assertion       `yaml:"assertions" json:"assertions"`
+	ExpectedOutput string            `yaml:"expected_output,omitempty" json:"expected_output,omitempty"`
+	Skip           bool              `yaml:"skip,omitempty" json:"skip,omitempty"`
+	Tags           []string          `yaml:"tags,omitempty" json:"tags,omitempty"`
 }
 
 // Assertion defines an expected condition on the output
@@ -52,6 +54,7 @@ const (
 	AssertMinLines      AssertionType = "min_lines"
 	AssertMaxLines      AssertionType = "max_lines"
 	AssertWordCount     AssertionType = "word_count"
+	AssertSnapshot      AssertionType = "snapshot"       // compare against stored expected_output
 	AssertSentiment     AssertionType = "sentiment"      // positive, negative, neutral
 	AssertLanguage      AssertionType = "language"       // e.g., "en", "es"
 )
@@ -95,7 +98,12 @@ func ParseSuiteFile(path string) (*TestSuite, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read test suite: %w", err)
 	}
-	return ParseSuite(data)
+	suite, err := ParseSuite(data)
+	if err != nil {
+		return nil, err
+	}
+	suite.FilePath = path
+	return suite, nil
 }
 
 // ParseSuite parses a test suite from YAML data
@@ -133,6 +141,59 @@ func ParseSuite(data []byte) (*TestSuite, error) {
 	return &suite, nil
 }
 
+// UpdateSnapshot reads a suite file, updates expected_output for a given test, and writes it back
+func UpdateSnapshot(path string, testName string, output string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	var raw yaml.Node
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	// Navigate to the test case by name and set expected_output
+	if raw.Content == nil || len(raw.Content) == 0 {
+		return fmt.Errorf("empty YAML document")
+	}
+	root := raw.Content[0] // mapping node
+
+	for i := 0; i < len(root.Content)-1; i += 2 {
+		if root.Content[i].Value == "tests" {
+			tests := root.Content[i+1]
+			for _, tc := range tests.Content {
+				// Each test case is a mapping node
+				for j := 0; j < len(tc.Content)-1; j += 2 {
+					if tc.Content[j].Value == "name" && tc.Content[j+1].Value == testName {
+						// Find or create expected_output
+						found := false
+						for k := 0; k < len(tc.Content)-1; k += 2 {
+							if tc.Content[k].Value == "expected_output" {
+								tc.Content[k+1].Value = output
+								tc.Content[k+1].Style = yaml.LiteralStyle
+								found = true
+								break
+							}
+						}
+						if !found {
+							keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "expected_output"}
+							valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: output, Style: yaml.LiteralStyle}
+							tc.Content = append(tc.Content, keyNode, valNode)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	out, err := yaml.Marshal(&raw)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, out, 0644)
+}
+
 func validateAssertion(a Assertion) error {
 	switch a.Type {
 	case AssertContains, AssertNotContains, AssertEquals, AssertMatches,
@@ -149,7 +210,7 @@ func validateAssertion(a Assertion) error {
 		if a.Path == "" {
 			return fmt.Errorf("json_path requires a path")
 		}
-	case AssertJSONValid, AssertNotEmpty:
+	case AssertJSONValid, AssertNotEmpty, AssertSnapshot:
 		// No value required
 	case AssertSentiment:
 		if a.Value == nil {
