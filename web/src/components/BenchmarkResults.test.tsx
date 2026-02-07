@@ -159,6 +159,12 @@ describe('BenchmarkResults', () => {
     expect(screen.queryByText('★')).not.toBeInTheDocument()
   })
 
+  it('renders export JSON and CSV buttons', () => {
+    render(<BenchmarkResults results={mockResult} />)
+    expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'CSV' })).toBeInTheDocument()
+  })
+
   it('handles all models with errors', () => {
     const allErrorsResult: BenchmarkResult = {
       ...mockResult,

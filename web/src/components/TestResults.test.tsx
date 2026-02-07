@@ -159,6 +159,12 @@ describe('TestResults', () => {
     expect(screen.getByText('Template parsing failed')).toBeInTheDocument()
   })
 
+  it('renders export JSON and CSV buttons', () => {
+    render(<TestResults results={mockResults} />)
+    expect(screen.getByRole('button', { name: 'JSON' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'CSV' })).toBeInTheDocument()
+  })
+
   it('does not show skipped count when zero', () => {
     const noSkipped: SuiteResult = {
       ...mockResults,

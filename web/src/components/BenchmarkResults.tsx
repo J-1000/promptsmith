@@ -1,4 +1,15 @@
+import { useCallback } from 'react'
 import styles from './BenchmarkResults.module.css'
+
+function downloadBlob(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export interface ModelResult {
   model: string
@@ -54,6 +65,19 @@ export function BenchmarkResults({ results, onRunBenchmark, isRunning }: Benchma
   const bestLatency = getBestByLatency(models)
   const bestCost = getBestByCost(models)
 
+  const exportJSON = useCallback(() => {
+    downloadBlob(JSON.stringify(results, null, 2), `${results.suiteName}-benchmark.json`, 'application/json')
+  }, [results])
+
+  const exportCSV = useCallback(() => {
+    const headers = ['Model', 'Runs', 'Latency P50 (ms)', 'Latency P99 (ms)', 'Latency Avg (ms)', 'Tokens Avg', 'Cost/Request', 'Total Cost', 'Errors', 'Error Rate']
+    const rows = models.map(m => [
+      m.model, m.runs, m.latencyP50Ms, m.latencyP99Ms, m.latencyAvgMs,
+      m.totalTokensAvg, m.costPerRequest, m.totalCost, m.errors, m.errorRate,
+    ].join(','))
+    downloadBlob([headers.join(','), ...rows].join('\n'), `${results.suiteName}-benchmark.csv`, 'text/csv')
+  }, [results, models])
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -63,6 +87,8 @@ export function BenchmarkResults({ results, onRunBenchmark, isRunning }: Benchma
         </div>
         <div className={styles.headerMeta}>
           <span className={styles.duration}>{formatDuration(durationMs)}</span>
+          <button className={styles.exportButton} onClick={exportJSON}>JSON</button>
+          <button className={styles.exportButton} onClick={exportCSV}>CSV</button>
           {onRunBenchmark && (
             <button
               className={styles.rerunButton}

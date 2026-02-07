@@ -47,6 +47,25 @@
   color: var(--text-muted);
 }
 
+.exportButton {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.exportButton:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-muted);
+  color: var(--accent-primary);
+}
+
 .rerunButton {
   font-family: var(--font-display);
   font-size: 12px;

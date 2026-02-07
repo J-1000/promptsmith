@@ -1,4 +1,15 @@
+import { useCallback } from 'react'
 import styles from './TestResults.module.css'
+
+function downloadBlob(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export interface TestResult {
   testName: string
@@ -54,6 +65,18 @@ export function TestResults({ results, onRunTests, isRunning }: TestResultsProps
 
   const { passed, failed, skipped, total, durationMs } = results
 
+  const exportJSON = useCallback(() => {
+    downloadBlob(JSON.stringify(results, null, 2), `${results.suiteName}-tests.json`, 'application/json')
+  }, [results])
+
+  const exportCSV = useCallback(() => {
+    const headers = ['Test Name', 'Passed', 'Skipped', 'Duration (ms)', 'Error']
+    const rows = results.results.map(t => [
+      `"${t.testName}"`, t.passed, t.skipped, t.durationMs, `"${t.error || ''}"`,
+    ].join(','))
+    downloadBlob([headers.join(','), ...rows].join('\n'), `${results.suiteName}-tests.csv`, 'text/csv')
+  }, [results])
+
   return (
     <div className={styles.container}>
       <div className={styles.summary}>
@@ -65,6 +88,8 @@ export function TestResults({ results, onRunTests, isRunning }: TestResultsProps
         </div>
         <div className={styles.summaryMeta}>
           <span className={styles.duration}>{durationMs}ms</span>
+          <button className={styles.exportButton} onClick={exportJSON}>JSON</button>
+          <button className={styles.exportButton} onClick={exportCSV}>CSV</button>
           {onRunTests && (
             <button
               className={styles.rerunButton}
