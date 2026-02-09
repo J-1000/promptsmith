@@ -8,6 +8,7 @@ import { BenchmarksPage } from './pages/BenchmarksPage'
 import { BenchmarkDetailPage } from './pages/BenchmarkDetailPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { EditorPage } from './pages/EditorPage'
+import { PlaygroundPage } from './pages/PlaygroundPage'
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="tests/:name" element={<TestDetailPage />} />
         <Route path="benchmarks" element={<BenchmarksPage />} />
         <Route path="benchmarks/:name" element={<BenchmarkDetailPage />} />
+        <Route path="playground" element={<PlaygroundPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
