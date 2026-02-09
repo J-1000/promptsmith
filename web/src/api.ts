@@ -363,3 +363,42 @@ export async function generateExpansion(prompt: string, goal?: string, model?: s
     body: JSON.stringify({ prompt, goal, model }),
   });
 }
+
+// Playground
+
+export interface PlaygroundRunRequest {
+  prompt_name?: string;
+  content?: string;
+  version?: string;
+  model: string;
+  variables?: Record<string, string>;
+  max_tokens?: number;
+  temperature?: number;
+}
+
+export interface PlaygroundRunResponse {
+  output: string;
+  rendered_prompt: string;
+  model: string;
+  prompt_tokens: number;
+  output_tokens: number;
+  latency_ms: number;
+  cost: number;
+}
+
+export async function runPlayground(req: PlaygroundRunRequest): Promise<PlaygroundRunResponse> {
+  return fetchApi<PlaygroundRunResponse>('/api/playground/run', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  });
+}
+
+export interface ModelInfo {
+  id: string;
+  provider: string;
+}
+
+export async function getAvailableModels(): Promise<ModelInfo[]> {
+  const res = await fetchApi<{ models: ModelInfo[] }>('/api/providers/models');
+  return res.models;
+}
