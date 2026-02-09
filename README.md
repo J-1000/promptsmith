@@ -13,6 +13,7 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Benchmarking** — Compare prompts across OpenAI and Anthropic models, result comparison
 - **AI Generation** — Generate variations, compress, or expand prompts with LLMs
 - **Cloud Sync** — Push and pull prompts to/from remote for collaboration
+- **Playground** — Interactive prompt runner: pick model, fill variables, see output with token/cost/latency stats
 - **Web Dashboard** — CodeMirror editor, inline diff comments, export reports, recommendation cards
 - **Documentation** — VitePress docs site with CLI, API, and Web UI reference
 
@@ -308,6 +309,7 @@ Features:
 - **Benchmarks page** — Browse benchmarks, run and compare, recommendation cards (best overall/throughput/budget), export JSON/CSV
 - **Settings** — Project info, LLM provider config, team/sync configuration
 - **AI generation** — Generate prompt variations, compress, expand, rephrase
+- **Playground** — Interactive prompt runner with library/ad-hoc mode, variable filling, model selection, and output stats
 
 ### API Server
 
@@ -348,6 +350,8 @@ promptsmith serve --port 3000  # Custom port
 - `POST /api/generate` — Generate prompt variations
 - `POST /api/generate/compress` — Compress prompt
 - `POST /api/generate/expand` — Expand prompt
+- `POST /api/playground/run` — Run prompt in playground
+- `GET  /api/providers/models` — List available models
 
 ## Cloud Sync
 
@@ -421,6 +425,7 @@ Pages: [Getting Started](docs/getting-started.md) | [CLI Reference](docs/cli-ref
 - [x] **Phase 6**: Full web UI — editor, tests, benchmarks, settings, dashboard
 - [x] **Phase 7**: CRUD completion, tag management, confirmations
 - [x] **Phase 8**: CodeMirror editor, inline comments, snapshot testing, benchmark compare, flaky detection, export reports, VitePress docs
+- [x] **Phase 9**: Interactive playground — run prompts against LLMs with variable filling, model selection, and output stats
 
 ## License
 

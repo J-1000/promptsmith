@@ -1,11 +1,11 @@
 PromptSmith Development Progress
 ================================
 
-Summary (Phase 8 complete):
-  - 8 phases complete
+Summary (Phase 9 complete):
+  - 9 phases complete
   - Go CLI: 20+ commands, 10 packages, all tests passing
-  - Web UI: 16 test files, 160+ tests passing, 10 pages
-  - API: 25+ endpoints (full CRUD + history + comments)
+  - Web UI: 17 test files, 182 tests passing, 11 pages
+  - API: 27+ endpoints (full CRUD + history + comments + playground)
   - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
 Phase 1: Foundation — CLI Only [COMPLETE]
@@ -420,6 +420,33 @@ New CLI features:
 
 New assertion type:
   snapshot — compare output against stored expected_output
+
+
+Phase 9: Interactive Playground [COMPLETE]
+------------------------------------------
+  [x] POST /api/playground/run — run prompt against LLM (library or ad-hoc, variables, model, temperature, max_tokens)
+  [x] GET /api/providers/models — list available models based on configured API keys
+  [x] API client: runPlayground(), getAvailableModels()
+  [x] PlaygroundPage with two-panel layout (input/output)
+  [x] Source toggle: "From Library" (prompt/version dropdowns) vs "Ad-hoc" (textarea)
+  [x] Auto-detected {{variable}} fields with input forms
+  [x] Model selector, temperature slider (0-2), max tokens input
+  [x] Output display with stats bar (latency, tokens in/out, cost)
+  [x] Loading spinner, error display, rendered prompt toggle
+  [x] Route /playground + nav link
+  [x] 17 new tests for PlaygroundPage
+
+New files:
+  web/src/pages/PlaygroundPage.tsx          Playground page
+  web/src/pages/PlaygroundPage.module.css   Playground styles
+  web/src/pages/PlaygroundPage.test.tsx     Tests (17 tests)
+
+New API endpoints:
+  POST /api/playground/run        Run prompt in playground
+  GET  /api/providers/models      List available models
+
+Web UI routes (updated):
+  /playground             Interactive playground
 
 
 Build & Test
