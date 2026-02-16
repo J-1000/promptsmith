@@ -1,11 +1,11 @@
 PromptSmith Development Progress
 ================================
 
-Summary (Phase 9 complete):
-  - 9 phases complete
+Summary (Phase 10 complete):
+  - 10 phases complete
   - Go CLI: 20+ commands, 10 packages, all tests passing
-  - Web UI: 17 test files, 182 tests passing, 11 pages
-  - API: 27+ endpoints (full CRUD + history + comments + playground)
+  - Web UI: 17 test files, 190+ tests passing, 11 pages
+  - API: 29+ endpoints (full CRUD + history + comments + playground + dashboard)
   - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
 Phase 1: Foundation — CLI Only [COMPLETE]
@@ -447,6 +447,31 @@ New API endpoints:
 
 Web UI routes (updated):
   /playground             Interactive playground
+
+
+Phase 10: Dashboard Enhancement [COMPLETE]
+-------------------------------------------
+  [x] DB methods: GetRecentActivity (UNION across versions, test runs, benchmark runs), GetPromptHealth (per-prompt aggregation)
+  [x] GET /api/dashboard/activity — recent activity feed (with limit param)
+  [x] GET /api/dashboard/health — per-prompt health indicators (version count, test status, pass rate)
+  [x] API client: getDashboardActivity(), getDashboardHealth()
+  [x] Activity feed section on HomePage (timeline icons, relative timestamps, prompt badges)
+  [x] Health indicators on prompt cards (colored dot: green=passing, red=failing, gray=none; pass rate %)
+  [x] 8 new HomePage tests (activity rendering, empty state, health dots, pass rates, API failure)
+  [x] 7 new Go tests (activity list, limit, empty, health, empty health, method not allowed, not found)
+
+Modified files:
+  cli/internal/db/db.go             GetRecentActivity, GetPromptHealth methods
+  cli/internal/api/server.go        /api/dashboard/activity, /api/dashboard/health handlers
+  cli/internal/api/server_test.go   7 new tests
+  web/src/api.ts                    getDashboardActivity, getDashboardHealth
+  web/src/pages/HomePage.tsx        Activity feed section, health indicators on cards
+  web/src/pages/HomePage.module.css Activity feed and health indicator styles
+  web/src/pages/HomePage.test.tsx   8 new tests
+
+New API endpoints:
+  GET /api/dashboard/activity       Recent activity feed
+  GET /api/dashboard/health         Per-prompt health indicators
 
 
 Build & Test
