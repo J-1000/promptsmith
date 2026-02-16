@@ -14,7 +14,7 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **AI Generation** — Generate variations, compress, or expand prompts with LLMs
 - **Cloud Sync** — Push and pull prompts to/from remote for collaboration
 - **Playground** — Interactive prompt runner: pick model, fill variables, see output with token/cost/latency stats
-- **Web Dashboard** — CodeMirror editor, inline diff comments, export reports, recommendation cards
+- **Web Dashboard** — Activity feed, health indicators, CodeMirror editor, inline diff comments, export reports
 - **Documentation** — VitePress docs site with CLI, API, and Web UI reference
 
 ## Installation
@@ -299,7 +299,7 @@ npm run dev        # Runs on http://localhost:8081
 ```
 
 Features:
-- **Dashboard** — Project stats (prompts, test suites, test cases, benchmarks)
+- **Dashboard** — Project stats, recent activity feed, per-prompt health indicators
 - **Prompt list** — Version badges, search/filter, create new prompts
 - **Prompt detail** — Tabbed view: content, history, diff with inline comments, change impact preview
 - **Prompt editor** — CodeMirror 6 with syntax highlighting, `{{variable}}` detection, dark theme
@@ -352,6 +352,8 @@ promptsmith serve --port 3000  # Custom port
 - `POST /api/generate/expand` — Expand prompt
 - `POST /api/playground/run` — Run prompt in playground
 - `GET  /api/providers/models` — List available models
+- `GET  /api/dashboard/activity` — Recent activity feed
+- `GET  /api/dashboard/health` — Per-prompt health indicators
 
 ## Cloud Sync
 
@@ -426,6 +428,7 @@ Pages: [Getting Started](docs/getting-started.md) | [CLI Reference](docs/cli-ref
 - [x] **Phase 7**: CRUD completion, tag management, confirmations
 - [x] **Phase 8**: CodeMirror editor, inline comments, snapshot testing, benchmark compare, flaky detection, export reports, VitePress docs
 - [x] **Phase 9**: Interactive playground — run prompts against LLMs with variable filling, model selection, and output stats
+- [x] **Phase 10**: Dashboard enhancement — activity feed, per-prompt health indicators
 
 ## License
 
