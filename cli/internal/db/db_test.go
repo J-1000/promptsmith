@@ -462,6 +462,184 @@ func TestSaveAndListBenchmarkRuns(t *testing.T) {
 	}
 }
 
+func TestChainCRUD(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+
+	// Create chain
+	chain, err := db.CreateChain(project.ID, "summarize-translate", "Summarize then translate")
+	if err != nil {
+		t.Fatalf("CreateChain failed: %v", err)
+	}
+	if chain.Name != "summarize-translate" {
+		t.Errorf("expected name 'summarize-translate', got '%s'", chain.Name)
+	}
+
+	// Get by name
+	byName, err := db.GetChainByName("summarize-translate")
+	if err != nil {
+		t.Fatalf("GetChainByName failed: %v", err)
+	}
+	if byName.ID != chain.ID {
+		t.Errorf("expected ID '%s', got '%s'", chain.ID, byName.ID)
+	}
+
+	// Get by ID
+	byID, err := db.GetChainByID(chain.ID)
+	if err != nil {
+		t.Fatalf("GetChainByID failed: %v", err)
+	}
+	if byID.Name != chain.Name {
+		t.Errorf("expected name '%s', got '%s'", chain.Name, byID.Name)
+	}
+
+	// List chains
+	db.CreateChain(project.ID, "alpha-chain", "")
+	chains, err := db.ListChains()
+	if err != nil {
+		t.Fatalf("ListChains failed: %v", err)
+	}
+	if len(chains) != 2 {
+		t.Errorf("expected 2 chains, got %d", len(chains))
+	}
+	if chains[0].Name != "alpha-chain" {
+		t.Errorf("expected first chain 'alpha-chain', got '%s'", chains[0].Name)
+	}
+
+	// Update
+	updated, err := db.UpdateChain(chain.ID, "new-name", "new desc")
+	if err != nil {
+		t.Fatalf("UpdateChain failed: %v", err)
+	}
+	if updated.Name != "new-name" {
+		t.Errorf("expected name 'new-name', got '%s'", updated.Name)
+	}
+
+	// Not found
+	notFound, err := db.GetChainByName("nonexistent")
+	if err != nil {
+		t.Fatalf("GetChainByName failed: %v", err)
+	}
+	if notFound != nil {
+		t.Error("expected nil for non-existent chain")
+	}
+}
+
+func TestChainSteps(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	chain, _ := db.CreateChain(project.ID, "my-chain", "")
+
+	// Create steps
+	s1, err := db.CreateChainStep(chain.ID, 1, "summarize", `{"text":"{{input.text}}"}`, "summary")
+	if err != nil {
+		t.Fatalf("CreateChainStep failed: %v", err)
+	}
+	if s1.PromptName != "summarize" {
+		t.Errorf("expected prompt 'summarize', got '%s'", s1.PromptName)
+	}
+
+	db.CreateChainStep(chain.ID, 2, "translate", `{"text":"{{steps.summary.output}}"}`, "translation")
+
+	// List steps
+	steps, err := db.ListChainSteps(chain.ID)
+	if err != nil {
+		t.Fatalf("ListChainSteps failed: %v", err)
+	}
+	if len(steps) != 2 {
+		t.Errorf("expected 2 steps, got %d", len(steps))
+	}
+	if steps[0].StepOrder != 1 {
+		t.Errorf("expected first step order 1, got %d", steps[0].StepOrder)
+	}
+
+	// Replace steps
+	newSteps := []ChainStep{
+		{StepOrder: 1, PromptName: "expand", InputMapping: `{"text":"{{input.text}}"}`, OutputKey: "expanded"},
+	}
+	err = db.ReplaceChainSteps(chain.ID, newSteps)
+	if err != nil {
+		t.Fatalf("ReplaceChainSteps failed: %v", err)
+	}
+
+	steps, _ = db.ListChainSteps(chain.ID)
+	if len(steps) != 1 {
+		t.Errorf("expected 1 step after replace, got %d", len(steps))
+	}
+	if steps[0].PromptName != "expand" {
+		t.Errorf("expected prompt 'expand', got '%s'", steps[0].PromptName)
+	}
+}
+
+func TestChainRuns(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	chain, _ := db.CreateChain(project.ID, "my-chain", "")
+
+	// Save run
+	run, err := db.SaveChainRun(chain.ID, "completed", `{"text":"hello"}`, `[{"step":"s1","output":"hi"}]`, "hi")
+	if err != nil {
+		t.Fatalf("SaveChainRun failed: %v", err)
+	}
+	if run.Status != "completed" {
+		t.Errorf("expected status 'completed', got '%s'", run.Status)
+	}
+
+	db.SaveChainRun(chain.ID, "failed", `{}`, `[]`, "")
+
+	// List runs
+	runs, err := db.ListChainRuns(chain.ID)
+	if err != nil {
+		t.Fatalf("ListChainRuns failed: %v", err)
+	}
+	if len(runs) != 2 {
+		t.Errorf("expected 2 runs, got %d", len(runs))
+	}
+}
+
+func TestDeleteChainCascade(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	chain, _ := db.CreateChain(project.ID, "to-delete", "")
+	db.CreateChainStep(chain.ID, 1, "prompt", `{}`, "out")
+	db.SaveChainRun(chain.ID, "completed", `{}`, `[]`, "result")
+
+	err := db.DeleteChain(chain.ID)
+	if err != nil {
+		t.Fatalf("DeleteChain failed: %v", err)
+	}
+
+	// Verify all deleted
+	found, _ := db.GetChainByID(chain.ID)
+	if found != nil {
+		t.Error("expected chain to be deleted")
+	}
+
+	steps, _ := db.ListChainSteps(chain.ID)
+	if len(steps) != 0 {
+		t.Errorf("expected 0 steps, got %d", len(steps))
+	}
+
+	runs, _ := db.ListChainRuns(chain.ID)
+	if len(runs) != 0 {
+		t.Errorf("expected 0 runs, got %d", len(runs))
+	}
+
+	// Delete non-existent
+	err = db.DeleteChain("nonexistent")
+	if err == nil {
+		t.Error("expected error when deleting non-existent chain")
+	}
+}
+
 func TestGetVersionByID(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
