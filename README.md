@@ -13,6 +13,7 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 - **Benchmarking** — Compare prompts across OpenAI and Anthropic models, result comparison
 - **AI Generation** — Generate variations, compress, or expand prompts with LLMs
 - **Cloud Sync** — Push and pull prompts to/from remote for collaboration
+- **Prompt Chains** — Chain prompts into pipelines where output of step N feeds into step N+1
 - **Playground** — Interactive prompt runner: pick model, fill variables, see output with token/cost/latency stats
 - **Web Dashboard** — Activity feed, health indicators, CodeMirror editor, inline diff comments, export reports
 - **Documentation** — VitePress docs site with CLI, API, and Web UI reference
@@ -87,6 +88,10 @@ promptsmith log
 | `promptsmith benchmark [files...]` | Run model benchmarks |
 | `promptsmith benchmark compare <f1> <f2>` | Compare two benchmark result files |
 | `promptsmith generate <prompt>` | Generate prompt variations with AI |
+| `promptsmith chain list` | List all prompt chains |
+| `promptsmith chain create <name>` | Create a new chain |
+| `promptsmith chain show <name>` | Show chain details and steps |
+| `promptsmith chain run <name>` | Execute a chain against an LLM |
 | `promptsmith config` | View/modify project configuration |
 | `promptsmith serve` | Start API server for web UI integration |
 | `promptsmith login` | Authenticate with PromptSmith cloud |
@@ -309,6 +314,7 @@ Features:
 - **Benchmarks page** — Browse benchmarks, run and compare, recommendation cards (best overall/throughput/budget), export JSON/CSV
 - **Settings** — Project info, LLM provider config, team/sync configuration
 - **AI generation** — Generate prompt variations, compress, expand, rephrase
+- **Chains** — Build and run prompt pipelines: step editor with prompt dropdown, input mapping, visual connectors, expandable run results
 - **Playground** — Interactive prompt runner with library/ad-hoc mode, variable filling, model selection, and output stats
 
 ### API Server
@@ -354,6 +360,14 @@ promptsmith serve --port 3000  # Custom port
 - `GET  /api/providers/models` — List available models
 - `GET  /api/dashboard/activity` — Recent activity feed
 - `GET  /api/dashboard/health` — Per-prompt health indicators
+- `GET  /api/chains` — List chains
+- `POST /api/chains` — Create chain
+- `GET  /api/chains/:name` — Get chain with steps
+- `PUT  /api/chains/:name` — Update chain
+- `DELETE /api/chains/:name` — Delete chain
+- `PUT  /api/chains/:name/steps` — Bulk replace chain steps
+- `POST /api/chains/:name/run` — Execute chain
+- `GET  /api/chains/:name/runs` — Chain run history
 
 ## Cloud Sync
 
@@ -429,6 +443,7 @@ Pages: [Getting Started](docs/getting-started.md) | [CLI Reference](docs/cli-ref
 - [x] **Phase 8**: CodeMirror editor, inline comments, snapshot testing, benchmark compare, flaky detection, export reports, VitePress docs
 - [x] **Phase 9**: Interactive playground — run prompts against LLMs with variable filling, model selection, and output stats
 - [x] **Phase 10**: Dashboard enhancement — activity feed, per-prompt health indicators
+- [x] **Phase 11**: Prompt chains — chain prompts into pipelines, step editor, run execution
 
 ## License
 
