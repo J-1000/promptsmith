@@ -318,6 +318,41 @@
   border: 1px solid var(--accent-muted);
 }
 
+/* Health indicators */
+.healthBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.healthDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.healthDot_passed {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.4);
+}
+
+.healthDot_failed {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.4);
+}
+
+.healthDot_none {
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.healthText {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 .loading,
 .error,
 .empty {

@@ -241,6 +241,16 @@ export function HomePage() {
               <p className={styles.description}>{prompt.description || 'No description'}</p>
               <div className={styles.cardFooter}>
                 <span className={styles.date}>{new Date(prompt.created_at).toLocaleDateString()}</span>
+                {healthMap[prompt.name] && (
+                  <div className={styles.healthBadge}>
+                    <span className={`${styles.healthDot} ${styles[`healthDot_${healthMap[prompt.name].last_test_status}`] || ''}`} />
+                    {healthMap[prompt.name].last_test_status !== 'none' && (
+                      <span className={styles.healthText}>
+                        {Math.round(healthMap[prompt.name].test_pass_rate * 100)}% passing
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </Link>
           ))}
