@@ -9,9 +9,11 @@ vi.mock('../api', () => ({
   listTests: vi.fn(),
   listBenchmarks: vi.fn(),
   createPrompt: vi.fn(),
+  getDashboardActivity: vi.fn(),
+  getDashboardHealth: vi.fn(),
 }))
 
-import { listPrompts, listTests, listBenchmarks, createPrompt } from '../api'
+import { listPrompts, listTests, listBenchmarks, createPrompt, getDashboardActivity, getDashboardHealth } from '../api'
 
 const mockPrompts = [
   {
@@ -40,6 +42,54 @@ const mockPrompts = [
   },
 ]
 
+const mockActivity = [
+  {
+    type: 'version',
+    title: 'v1.0.2',
+    detail: 'Added error handling',
+    timestamp: new Date().toISOString(),
+    prompt_name: 'greeting',
+  },
+  {
+    type: 'test_run',
+    title: 'passed',
+    detail: 'greeting-tests',
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    prompt_name: 'greeting',
+  },
+  {
+    type: 'benchmark_run',
+    title: 'completed',
+    detail: 'greeting-bench',
+    timestamp: new Date(Date.now() - 7200000).toISOString(),
+    prompt_name: 'greeting',
+  },
+]
+
+const mockHealth = [
+  {
+    prompt_name: 'greeting',
+    version_count: 3,
+    last_test_status: 'passed',
+    last_test_at: '2024-01-15T00:00:00Z',
+    test_pass_rate: 1.0,
+  },
+  {
+    prompt_name: 'summarize',
+    version_count: 5,
+    last_test_status: 'failed',
+    last_test_at: '2024-01-14T00:00:00Z',
+    test_pass_rate: 0.67,
+  },
+  {
+    prompt_name: 'code-review',
+    version_count: 1,
+    last_test_status: 'none',
+    last_test_at: '',
+    test_pass_rate: 0,
+  },
+]
+
 function renderWithRouter(ui: React.ReactElement) {
   return render(<BrowserRouter>{ui}</BrowserRouter>)
 }
@@ -53,6 +103,8 @@ describe('HomePage', () => {
     vi.mocked(listBenchmarks).mockResolvedValue([
       { name: 'greeting-bench', file_path: 'benchmarks/greeting.bench.yaml', prompt: 'greeting', models: ['gpt-4o'], runs_per_model: 5 },
     ])
+    vi.mocked(getDashboardActivity).mockResolvedValue(mockActivity)
+    vi.mocked(getDashboardHealth).mockResolvedValue(mockHealth)
   })
 
   it('renders the page title', async () => {
@@ -72,16 +124,18 @@ describe('HomePage', () => {
   it('renders prompt cards', async () => {
     renderWithRouter(<HomePage />)
     await waitFor(() => {
-      expect(screen.getByText('greeting')).toBeInTheDocument()
-      expect(screen.getByText('summarize')).toBeInTheDocument()
-      expect(screen.getByText('code-review')).toBeInTheDocument()
+      // Use getAllByText since 'greeting' appears in both card and activity
+      expect(screen.getAllByText('greeting').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('summarize').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('code-review').length).toBeGreaterThanOrEqual(1)
     })
   })
 
   it('shows version badges', async () => {
     renderWithRouter(<HomePage />)
     await waitFor(() => {
-      expect(screen.getByText('v1.0.2')).toBeInTheDocument()
+      // v1.0.2 appears in both version badge and activity event
+      expect(screen.getAllByText('v1.0.2').length).toBeGreaterThanOrEqual(1)
       expect(screen.getByText('v2.1.0')).toBeInTheDocument()
       expect(screen.getByText('v1.0.0')).toBeInTheDocument()
     })
@@ -121,14 +175,15 @@ describe('HomePage', () => {
     renderWithRouter(<HomePage />)
 
     await waitFor(() => {
-      expect(screen.getByText('greeting')).toBeInTheDocument()
+      expect(screen.getAllByText('greeting').length).toBeGreaterThanOrEqual(1)
     })
 
     const searchInput = screen.getByPlaceholderText(/search prompts/i)
-    await user.type(searchInput, 'greeting')
+    await user.type(searchInput, 'summarize')
 
-    expect(screen.getByText('greeting')).toBeInTheDocument()
-    expect(screen.queryByText('summarize')).not.toBeInTheDocument()
+    // After filtering, only summarize card should be in the grid
+    expect(screen.getAllByText('summarize').length).toBeGreaterThanOrEqual(1)
+    // greeting still appears in activity feed but not in filtered cards
     expect(screen.queryByText('code-review')).not.toBeInTheDocument()
   })
 
@@ -137,7 +192,7 @@ describe('HomePage', () => {
     renderWithRouter(<HomePage />)
 
     await waitFor(() => {
-      expect(screen.getByText('greeting')).toBeInTheDocument()
+      expect(screen.getAllByText('greeting').length).toBeGreaterThanOrEqual(1)
     })
 
     const searchInput = screen.getByPlaceholderText(/search prompts/i)
@@ -190,5 +245,75 @@ describe('HomePage', () => {
     await waitFor(() => {
       expect(createPrompt).toHaveBeenCalledWith('new-one', 'A new prompt', undefined)
     })
+  })
+
+  // Activity feed tests
+
+  it('renders activity feed section', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByText('Recent Activity')).toBeInTheDocument()
+    })
+  })
+
+  it('renders activity events with details', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByText('Added error handling')).toBeInTheDocument()
+      expect(screen.getByText('greeting-tests')).toBeInTheDocument()
+      expect(screen.getByText('greeting-bench')).toBeInTheDocument()
+    })
+  })
+
+  it('shows prompt names in activity events', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      // 'greeting' appears in card + multiple activity badges
+      const promptBadges = screen.getAllByText('greeting')
+      expect(promptBadges.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  it('hides activity section when no activity', async () => {
+    vi.mocked(getDashboardActivity).mockResolvedValue([])
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /prompts/i })).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Recent Activity')).not.toBeInTheDocument()
+  })
+
+  // Health indicator tests
+
+  it('shows health dot for prompts with passing tests', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByText('100% passing')).toBeInTheDocument()
+    })
+  })
+
+  it('shows pass rate for prompts with failing tests', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getByText('67% passing')).toBeInTheDocument()
+    })
+  })
+
+  it('does not show pass rate for prompts with no tests', async () => {
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      expect(screen.getAllByText('code-review').length).toBeGreaterThanOrEqual(1)
+    })
+    expect(screen.queryByText('0% passing')).not.toBeInTheDocument()
+  })
+
+  it('handles health API failure gracefully', async () => {
+    vi.mocked(getDashboardHealth).mockRejectedValue(new Error('Failed'))
+    renderWithRouter(<HomePage />)
+    await waitFor(() => {
+      // Cards still render despite health API failure
+      expect(screen.getAllByText('greeting').length).toBeGreaterThanOrEqual(1)
+    })
+    expect(screen.queryByText('100% passing')).not.toBeInTheDocument()
   })
 })
