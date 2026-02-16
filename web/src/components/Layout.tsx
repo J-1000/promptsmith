@@ -21,6 +21,7 @@ export function Layout() {
           <Link to="/" className={`${styles.navLink} ${isActive('/') ? styles.navLinkActive : ''}`}>Prompts</Link>
           <Link to="/tests" className={`${styles.navLink} ${isActive('/tests') ? styles.navLinkActive : ''}`}>Tests</Link>
           <Link to="/benchmarks" className={`${styles.navLink} ${isActive('/benchmarks') ? styles.navLinkActive : ''}`}>Benchmarks</Link>
+          <Link to="/chains" className={`${styles.navLink} ${isActive('/chains') ? styles.navLinkActive : ''}`}>Chains</Link>
           <Link to="/playground" className={`${styles.navLink} ${isActive('/playground') ? styles.navLinkActive : ''}`}>Playground</Link>
           <Link to="/settings" className={`${styles.navLink} ${isActive('/settings') ? styles.navLinkActive : ''}`}>Settings</Link>
         </nav>

@@ -1,11 +1,11 @@
 PromptSmith Development Progress
 ================================
 
-Summary (Phase 10 complete):
-  - 10 phases complete
+Summary (Phase 11 complete):
+  - 11 phases complete
   - Go CLI: 20+ commands, 10 packages, all tests passing
-  - Web UI: 17 test files, 190+ tests passing, 11 pages
-  - API: 29+ endpoints (full CRUD + history + comments + playground + dashboard)
+  - Web UI: 19 test files, 216+ tests passing, 13 pages
+  - API: 35+ endpoints (full CRUD + history + comments + playground + dashboard + chains)
   - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
 Phase 1: Foundation — CLI Only [COMPLETE]
@@ -522,3 +522,67 @@ Build & Test
   /path/to/promptsmith pull                            # Pull from cloud
   /path/to/promptsmith config sync.remote <url>        # Set remote URL
   /path/to/promptsmith config sync.team <team>         # Set team
+
+  # Phase 11 commands:
+  /path/to/promptsmith chain list                      # List chains
+  /path/to/promptsmith chain create my-chain -d "desc" # Create chain
+  /path/to/promptsmith chain show my-chain             # Show chain details
+  /path/to/promptsmith chain run my-chain --input text="hello" --model gpt-4o-mini
+
+
+Phase 11: Prompt Chains / Pipelines [COMPLETE]
+----------------------------------------------
+  [x] DB schema: chains, chain_steps, chain_runs tables with indexes
+  [x] Chain CRUD: CreateChain, GetChainByName/ID, ListChains, UpdateChain, DeleteChain (cascade)
+  [x] Steps: CreateChainStep, ListChainSteps, ReplaceChainSteps (bulk tx)
+  [x] Runs: SaveChainRun, ListChainRuns
+  [x] 4 new Go DB tests (chain CRUD, steps, runs, cascade delete)
+  [x] API endpoints: /api/chains (list/create), /api/chains/{name} (get/update/delete)
+  [x] API endpoints: /api/chains/{name}/steps (PUT bulk replace)
+  [x] API endpoints: /api/chains/{name}/run (POST execute chain)
+  [x] API endpoints: /api/chains/{name}/runs (GET history)
+  [x] Chain execution: resolve input mappings, load prompts, render templates, call LLM
+  [x] CLI: promptsmith chain list|create|show|run subcommands
+  [x] Web API client: 8 new functions (listChains, getChain, createChain, updateChain, deleteChain, saveChainSteps, runChain, listChainRuns)
+  [x] ChainsPage: list with search, cards, create modal
+  [x] ChainDetailPage: step editor (prompt dropdown, output key, input mappings, reorder), run panel (auto-detected inputs, model selector, expandable results, final output)
+  [x] 26 new web tests (11 ChainsPage, 15 ChainDetailPage)
+  [x] Routes: /chains, /chains/:name
+  [x] Nav: "Chains" link in Layout
+
+New files:
+  cli/cmd/chain.go                              CLI chain command
+  web/src/pages/ChainsPage.tsx                  Chains listing
+  web/src/pages/ChainsPage.module.css
+  web/src/pages/ChainsPage.test.tsx             Tests (11 tests)
+  web/src/pages/ChainDetailPage.tsx             Chain detail + editor + runner
+  web/src/pages/ChainDetailPage.module.css
+  web/src/pages/ChainDetailPage.test.tsx        Tests (15 tests)
+
+Modified files:
+  cli/internal/db/db.go                         Chain structs, tables, CRUD
+  cli/internal/db/db_test.go                    4 new tests
+  cli/internal/api/server.go                    Chain handler endpoints
+  web/src/api.ts                                Chain types + API functions
+  web/src/App.tsx                               Chain routes
+  web/src/components/Layout.tsx                 Chains nav link
+
+New API endpoints:
+  GET    /api/chains                  List chains
+  POST   /api/chains                  Create chain
+  GET    /api/chains/:name            Get chain with steps
+  PUT    /api/chains/:name            Update chain
+  DELETE /api/chains/:name            Delete chain (cascade)
+  PUT    /api/chains/:name/steps      Bulk replace steps
+  POST   /api/chains/:name/run        Execute chain
+  GET    /api/chains/:name/runs       List run history
+
+Data model:
+  chains: id, name, description, project_id, created_at, updated_at
+  chain_steps: id, chain_id, step_order, prompt_name, input_mapping (JSON), output_key
+  chain_runs: id, chain_id, status, inputs (JSON), results (JSON), final_output, started_at, completed_at
+
+Input mapping resolves:
+  "{{input.var}}"              → chain's initial inputs
+  "{{steps.prev_key.output}}"  → previous step's output
+  literal string               → passed as-is
