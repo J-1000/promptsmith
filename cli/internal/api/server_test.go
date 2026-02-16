@@ -1433,6 +1433,189 @@ func TestSyncConfigNotConfigured(t *testing.T) {
 	}
 }
 
+func TestDashboardActivity(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create some versions to generate activity
+	prompt, _ := database.GetPromptByName("summarizer")
+	database.CreateVersion(prompt.ID, "1.0.0", "content v1", "[]", "{}", "First version", "user", nil)
+	database.CreateVersion(prompt.ID, "1.0.1", "content v2", "[]", "{}", "Second version", "user", nil)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/activity", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var response []ActivityEventResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(response) != 2 {
+		t.Errorf("got %d events, want 2", len(response))
+	}
+
+	if len(response) > 0 && response[0].Type != "version" {
+		t.Errorf("first event type = %q, want %q", response[0].Type, "version")
+	}
+}
+
+func TestDashboardActivityWithLimit(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	prompt, _ := database.GetPromptByName("summarizer")
+	database.CreateVersion(prompt.ID, "1.0.0", "v1", "[]", "{}", "First", "user", nil)
+	database.CreateVersion(prompt.ID, "1.0.1", "v2", "[]", "{}", "Second", "user", nil)
+	database.CreateVersion(prompt.ID, "1.0.2", "v3", "[]", "{}", "Third", "user", nil)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/activity?limit=2", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []ActivityEventResponse
+	json.NewDecoder(rec.Body).Decode(&response)
+
+	if len(response) != 2 {
+		t.Errorf("got %d events, want 2 (limited)", len(response))
+	}
+}
+
+func TestDashboardActivityEmpty(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/activity", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []ActivityEventResponse
+	json.NewDecoder(rec.Body).Decode(&response)
+
+	if response != nil && len(response) != 0 {
+		t.Errorf("expected empty activity, got %d events", len(response))
+	}
+}
+
+func TestDashboardHealth(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Create a version for the existing prompt
+	prompt, _ := database.GetPromptByName("summarizer")
+	database.CreateVersion(prompt.ID, "1.0.0", "content", "[]", "{}", "Initial", "user", nil)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/health", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var response []map[string]interface{}
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(response) != 1 {
+		t.Fatalf("got %d prompts, want 1", len(response))
+	}
+
+	if response[0]["prompt_name"] != "summarizer" {
+		t.Errorf("prompt_name = %v, want %q", response[0]["prompt_name"], "summarizer")
+	}
+	if response[0]["version_count"].(float64) != 1 {
+		t.Errorf("version_count = %v, want 1", response[0]["version_count"])
+	}
+	if response[0]["last_test_status"] != "none" {
+		t.Errorf("last_test_status = %v, want %q", response[0]["last_test_status"], "none")
+	}
+}
+
+func TestDashboardHealthEmpty(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	// Delete the default prompt
+	prompt, _ := database.GetPromptByName("summarizer")
+	database.DeletePrompt(prompt.ID)
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/health", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []map[string]interface{}
+	json.NewDecoder(rec.Body).Decode(&response)
+
+	if len(response) != 0 {
+		t.Errorf("expected empty health, got %d entries", len(response))
+	}
+}
+
+func TestDashboardMethodNotAllowed(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("POST", "/api/dashboard/activity", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestDashboardNotFound(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/dashboard/unknown", nil)
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestSyncConfigConfigured(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
