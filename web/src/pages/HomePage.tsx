@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listPrompts, listTests, listBenchmarks, createPrompt, Prompt, TestSuite, BenchmarkSuite } from '../api'
+import { listPrompts, listTests, listBenchmarks, createPrompt, getDashboardActivity, getDashboardHealth, Prompt, TestSuite, BenchmarkSuite, ActivityEvent, PromptHealth } from '../api'
 import { Toast } from '../components/Toast'
 import styles from './HomePage.module.css'
 
@@ -17,17 +17,27 @@ export function HomePage() {
   const [newContent, setNewContent] = useState('')
   const [creating, setCreating] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [activity, setActivity] = useState<ActivityEvent[]>([])
+  const [healthMap, setHealthMap] = useState<Record<string, PromptHealth>>({})
 
   useEffect(() => {
     Promise.all([
       listPrompts(),
       listTests().catch(() => [] as TestSuite[]),
       listBenchmarks().catch(() => [] as BenchmarkSuite[]),
+      getDashboardActivity(10).catch(() => [] as ActivityEvent[]),
+      getDashboardHealth().catch(() => [] as PromptHealth[]),
     ])
-      .then(([promptsData, testsData, benchmarksData]) => {
+      .then(([promptsData, testsData, benchmarksData, activityData, healthData]) => {
         setPrompts(promptsData)
         setTests(testsData)
         setBenchmarks(benchmarksData)
+        setActivity(activityData)
+        const map: Record<string, PromptHealth> = {}
+        for (const h of healthData) {
+          map[h.prompt_name] = h
+        }
+        setHealthMap(map)
       })
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -45,10 +55,18 @@ export function HomePage() {
       listPrompts(),
       listTests().catch(() => [] as TestSuite[]),
       listBenchmarks().catch(() => [] as BenchmarkSuite[]),
-    ]).then(([promptsData, testsData, benchmarksData]) => {
+      getDashboardActivity(10).catch(() => [] as ActivityEvent[]),
+      getDashboardHealth().catch(() => [] as PromptHealth[]),
+    ]).then(([promptsData, testsData, benchmarksData, activityData, healthData]) => {
       setPrompts(promptsData)
       setTests(testsData)
       setBenchmarks(benchmarksData)
+      setActivity(activityData)
+      const map: Record<string, PromptHealth> = {}
+      for (const h of healthData) {
+        map[h.prompt_name] = h
+      }
+      setHealthMap(map)
     })
   }
 
@@ -77,6 +95,26 @@ export function HomePage() {
       setToast({ message: msg, type: 'error' })
     } finally {
       setCreating(false)
+    }
+  }
+
+  const formatRelativeTime = (timestamp: string) => {
+    const diff = Date.now() - new Date(timestamp).getTime()
+    const minutes = Math.floor(diff / 60000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
+  const activityIcon = (type: string) => {
+    switch (type) {
+      case 'version': return '<>'
+      case 'test_run': return '\u2713'
+      case 'benchmark_run': return '\u25A0'
+      default: return '\u2022'
     }
   }
 
@@ -119,6 +157,29 @@ export function HomePage() {
           <span className={styles.statLabel}>Benchmarks</span>
         </Link>
       </div>
+
+      {activity.length > 0 && (
+        <div className={styles.activitySection}>
+          <h2 className={styles.activityTitle}>Recent Activity</h2>
+          <div className={styles.activityList}>
+            {activity.map((event, i) => (
+              <div key={i} className={styles.activityItem}>
+                <span className={`${styles.activityIcon} ${styles[`activityIcon_${event.type}`] || ''}`}>
+                  {activityIcon(event.type)}
+                </span>
+                <div className={styles.activityContent}>
+                  <span className={styles.activityItemTitle}>
+                    {event.title}
+                    <span className={styles.activityPrompt}>{event.prompt_name}</span>
+                  </span>
+                  <span className={styles.activityDetail}>{event.detail}</span>
+                </div>
+                <span className={styles.activityTime}>{formatRelativeTime(event.timestamp)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className={styles.header}>
         <div className={styles.headerRow}>

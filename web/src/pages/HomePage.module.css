@@ -47,6 +47,120 @@
   letter-spacing: 0.05em;
 }
 
+/* Activity feed */
+.activitySection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activityTitle {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.activityItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+}
+
+.activityItem:last-child {
+  border-bottom: none;
+}
+
+.activityItem:hover {
+  background: var(--bg-tertiary);
+}
+
+.activityIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+}
+
+.activityIcon_version {
+  background: var(--accent-glow);
+  color: var(--accent-primary);
+}
+
+.activityIcon_test_run {
+  background: rgba(52, 211, 153, 0.1);
+  color: #34d399;
+}
+
+.activityIcon_benchmark_run {
+  background: rgba(96, 165, 250, 0.1);
+  color: #60a5fa;
+}
+
+.activityContent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.activityItemTitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.activityPrompt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-primary);
+  padding: 1px 6px;
+  background: var(--accent-glow);
+  border-radius: 3px;
+}
+
+.activityDetail {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activityTime {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
 .header {
   display: flex;
   flex-direction: column;
