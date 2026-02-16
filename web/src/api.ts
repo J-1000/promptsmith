@@ -402,3 +402,30 @@ export async function getAvailableModels(): Promise<ModelInfo[]> {
   const res = await fetchApi<{ models: ModelInfo[] }>('/api/providers/models');
   return res.models;
 }
+
+// Dashboard
+
+export interface ActivityEvent {
+  type: string;
+  title: string;
+  detail: string;
+  timestamp: string;
+  prompt_name: string;
+}
+
+export interface PromptHealth {
+  prompt_name: string;
+  version_count: number;
+  last_test_status: string;
+  last_test_at: string;
+  test_pass_rate: number;
+}
+
+export async function getDashboardActivity(limit?: number): Promise<ActivityEvent[]> {
+  const query = limit ? `?limit=${limit}` : '';
+  return fetchApi<ActivityEvent[]>(`/api/dashboard/activity${query}`);
+}
+
+export async function getDashboardHealth(): Promise<PromptHealth[]> {
+  return fetchApi<PromptHealth[]>('/api/dashboard/health');
+}
