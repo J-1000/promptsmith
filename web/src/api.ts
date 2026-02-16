@@ -429,3 +429,110 @@ export async function getDashboardActivity(limit?: number): Promise<ActivityEven
 export async function getDashboardHealth(): Promise<PromptHealth[]> {
   return fetchApi<PromptHealth[]>('/api/dashboard/health');
 }
+
+// Chains
+
+export interface Chain {
+  id: string;
+  name: string;
+  description: string;
+  step_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChainStep {
+  id: string;
+  step_order: number;
+  prompt_name: string;
+  input_mapping: Record<string, string>;
+  output_key: string;
+}
+
+export interface ChainDetail {
+  id: string;
+  name: string;
+  description: string;
+  steps: ChainStep[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChainStepInput {
+  step_order: number;
+  prompt_name: string;
+  input_mapping: Record<string, string>;
+  output_key: string;
+}
+
+export interface ChainStepRunResult {
+  step_order: number;
+  prompt_name: string;
+  output_key: string;
+  rendered_prompt: string;
+  output: string;
+  duration_ms: number;
+}
+
+export interface ChainRunResult {
+  id: string;
+  status: string;
+  inputs: Record<string, string>;
+  results: ChainStepRunResult[];
+  final_output: string;
+  started_at: string;
+  completed_at: string;
+}
+
+export async function listChains(): Promise<Chain[]> {
+  return fetchApi<Chain[]>('/api/chains');
+}
+
+export async function getChain(name: string): Promise<ChainDetail> {
+  return fetchApi<ChainDetail>(`/api/chains/${name}`);
+}
+
+export async function createChain(name: string, description: string): Promise<Chain> {
+  return fetchApi<Chain>('/api/chains', {
+    method: 'POST',
+    body: JSON.stringify({ name, description }),
+  });
+}
+
+export async function updateChain(name: string, newName: string, description: string): Promise<Chain> {
+  return fetchApi<Chain>(`/api/chains/${name}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name: newName, description }),
+  });
+}
+
+export async function deleteChain(name: string): Promise<void> {
+  await fetch(`${API_BASE}/api/chains/${name}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  });
+}
+
+export async function saveChainSteps(name: string, steps: ChainStepInput[]): Promise<ChainStep[]> {
+  return fetchApi<ChainStep[]>(`/api/chains/${name}/steps`, {
+    method: 'PUT',
+    body: JSON.stringify({ steps }),
+  });
+}
+
+export async function runChain(
+  name: string,
+  inputs: Record<string, string>,
+  model: string
+): Promise<ChainRunResult> {
+  return fetchApi<ChainRunResult>(`/api/chains/${name}/run`, {
+    method: 'POST',
+    body: JSON.stringify({ inputs, model }),
+  });
+}
+
+export async function listChainRuns(name: string): Promise<ChainRunResult[]> {
+  return fetchApi<ChainRunResult[]>(`/api/chains/${name}/runs`);
+}
