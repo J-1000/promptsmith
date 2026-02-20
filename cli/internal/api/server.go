@@ -272,20 +272,29 @@ func (s *Server) createPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	filePath, err := safeJoinProjectPath(s.root, req.FilePath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	prompt, err := s.db.CreatePrompt(project.ID, req.Name, req.Description, req.FilePath)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Write file to disk
-	filePath, err := safeJoinProjectPath(s.root, req.FilePath)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+	rollbackPrompt := func(cause error) {
+		if delErr := s.db.DeletePrompt(prompt.ID); delErr != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("%v (rollback failed: %v)", cause, delErr))
+			return
+		}
+		writeError(w, http.StatusInternalServerError, cause.Error())
 	}
+
+	// Write file to disk
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create directory: %v", err))
+		rollbackPrompt(fmt.Errorf("failed to create directory: %w", err))
 		return
 	}
 
@@ -295,7 +304,7 @@ func (s *Server) createPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
+		rollbackPrompt(fmt.Errorf("failed to write file: %w", err))
 		return
 	}
 
