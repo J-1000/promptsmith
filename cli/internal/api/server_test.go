@@ -394,6 +394,28 @@ tests:
 	}
 }
 
+func TestCreateTestSuiteRejectsPathTraversal(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name":"../../escape","prompt":"summarizer"}`
+	req := httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	outsidePath := filepath.Join(filepath.Dir(tmpDir), "escape.test.yaml")
+	if _, err := os.Stat(outsidePath); !os.IsNotExist(err) {
+		t.Fatalf("outside file should not exist, err=%v", err)
+	}
+}
+
 func TestListBenchmarks(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
@@ -441,6 +463,28 @@ runs_per_model: 3
 		if response[0].RunsPerModel != 3 {
 			t.Errorf("runs_per_model = %d, want 3", response[0].RunsPerModel)
 		}
+	}
+}
+
+func TestCreateBenchmarkSuiteRejectsPathTraversal(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name":"../../escape","prompt":"summarizer"}`
+	req := httptest.NewRequest("POST", "/api/benchmarks", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+
+	outsidePath := filepath.Join(filepath.Dir(tmpDir), "escape.bench.yaml")
+	if _, err := os.Stat(outsidePath); !os.IsNotExist(err) {
+		t.Fatalf("outside file should not exist, err=%v", err)
 	}
 }
 

@@ -963,7 +963,11 @@ func (s *Server) createTestSuite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(testsDir, req.Name+".test.yaml")
+	filePath, err := safeJoinProjectPath(s.root, filepath.Join("tests", req.Name+".test.yaml"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	// Check for existing file
 	if _, err := os.Stat(filePath); err == nil {
@@ -1160,7 +1164,11 @@ func (s *Server) createBenchmarkSuite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(benchDir, req.Name+".bench.yaml")
+	filePath, err := safeJoinProjectPath(s.root, filepath.Join("benchmarks", req.Name+".bench.yaml"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if _, err := os.Stat(filePath); err == nil {
 		writeError(w, http.StatusConflict, fmt.Sprintf("benchmark suite '%s' already exists", req.Name))
