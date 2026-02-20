@@ -93,6 +93,11 @@ func runPull(cmd *cobra.Command, args []string) error {
 
 	// Sync prompts
 	for _, rp := range resp.Prompts {
+		safeFilePath, err := safeProjectPath(projectRoot, rp.FilePath)
+		if err != nil {
+			return fmt.Errorf("invalid remote path for prompt %s: %w", rp.Name, err)
+		}
+
 		localPrompt, err := database.GetPromptByName(rp.Name)
 		if err != nil {
 			return fmt.Errorf("failed to check prompt %s: %w", rp.Name, err)
@@ -107,15 +112,14 @@ func runPull(cmd *cobra.Command, args []string) error {
 			promptsAdded++
 
 			// Create the prompt file if it doesn't exist
-			filePath := filepath.Join(projectRoot, rp.FilePath)
-			if _, err := os.Stat(filePath); os.IsNotExist(err) {
+			if _, err := os.Stat(safeFilePath); os.IsNotExist(err) {
 				// Find the latest version content
 				for _, v := range resp.Versions {
 					if v.PromptID == rp.ID {
-						if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+						if err := os.MkdirAll(filepath.Dir(safeFilePath), 0755); err != nil {
 							return fmt.Errorf("failed to create directory for %s: %w", rp.Name, err)
 						}
-						if err := os.WriteFile(filePath, []byte(v.Content), 0644); err != nil {
+						if err := os.WriteFile(safeFilePath, []byte(v.Content), 0644); err != nil {
 							return fmt.Errorf("failed to write prompt file %s: %w", rp.Name, err)
 						}
 						break
