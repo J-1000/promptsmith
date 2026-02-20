@@ -170,6 +170,36 @@ func TestCreatePromptRejectsPathTraversal(t *testing.T) {
 	}
 }
 
+func TestCreatePromptRollsBackOnFileWriteFailure(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	blockingPath := filepath.Join(tmpDir, "blocked")
+	if err := os.WriteFile(blockingPath, []byte("not-a-directory"), 0644); err != nil {
+		t.Fatalf("failed to create blocking file: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name":"rollback-prompt","file_path":"blocked/rollback.prompt","content":"x"}`
+	req := httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	prompt, err := database.GetPromptByName("rollback-prompt")
+	if err != nil {
+		t.Fatalf("failed to query prompt: %v", err)
+	}
+	if prompt != nil {
+		t.Fatal("prompt row should be rolled back on file write failure")
+	}
+}
+
 func TestGetPromptByName(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
