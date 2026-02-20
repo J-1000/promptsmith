@@ -730,6 +730,26 @@ tests:
 	}
 }
 
+func TestGetTestRunRejectsMismatchedSuite(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	run, err := database.SaveTestRun("suite-a", "", "passed", `{"ok":true}`)
+	if err != nil {
+		t.Fatalf("failed to save run: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/tests/suite-b/runs/"+run.ID, nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
 func TestBenchmarkRunEndpoint(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
