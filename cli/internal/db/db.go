@@ -645,6 +645,46 @@ func (db *DB) DeletePrompt(promptID string) error {
 	return tx.Commit()
 }
 
+func (db *DB) EnsureTestSuite(id, promptID, name, config string) error {
+	if id == "" {
+		return fmt.Errorf("test suite id is required")
+	}
+	if config == "" {
+		config = "{}"
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO test_suites (id, prompt_id, name, config)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET prompt_id = excluded.prompt_id, name = excluded.name, config = excluded.config`,
+		id, promptID, name, config,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert test suite: %w", err)
+	}
+	return nil
+}
+
+func (db *DB) EnsureBenchmark(id, promptID, config string) error {
+	if id == "" {
+		return fmt.Errorf("benchmark id is required")
+	}
+	if config == "" {
+		config = "{}"
+	}
+
+	_, err := db.Exec(
+		`INSERT INTO benchmarks (id, prompt_id, config)
+		VALUES (?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET prompt_id = excluded.prompt_id, config = excluded.config`,
+		id, promptID, config,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to upsert benchmark: %w", err)
+	}
+	return nil
+}
+
 func (db *DB) GetAllVersionsForLog() ([]struct {
 	Prompt  *Prompt
 	Version *PromptVersion

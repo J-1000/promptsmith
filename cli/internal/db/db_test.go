@@ -462,6 +462,47 @@ func TestSaveAndListBenchmarkRuns(t *testing.T) {
 	}
 }
 
+func TestEnsureTestSuiteAndBenchmark(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
+
+	if err := db.EnsureTestSuite("suite-1", prompt.ID, "suite-1", "{}"); err != nil {
+		t.Fatalf("EnsureTestSuite failed: %v", err)
+	}
+	if err := db.EnsureTestSuite("suite-1", prompt.ID, "suite-1-renamed", `{"x":1}`); err != nil {
+		t.Fatalf("EnsureTestSuite update failed: %v", err)
+	}
+
+	var suiteName, suiteCfg string
+	if err := db.QueryRow("SELECT name, config FROM test_suites WHERE id = ?", "suite-1").Scan(&suiteName, &suiteCfg); err != nil {
+		t.Fatalf("failed to read test suite row: %v", err)
+	}
+	if suiteName != "suite-1-renamed" {
+		t.Fatalf("suite name = %q, want %q", suiteName, "suite-1-renamed")
+	}
+	if suiteCfg != `{"x":1}` {
+		t.Fatalf("suite config = %q, want %q", suiteCfg, `{"x":1}`)
+	}
+
+	if err := db.EnsureBenchmark("bench-1", prompt.ID, "{}"); err != nil {
+		t.Fatalf("EnsureBenchmark failed: %v", err)
+	}
+	if err := db.EnsureBenchmark("bench-1", prompt.ID, `{"models":["gpt-4o-mini"]}`); err != nil {
+		t.Fatalf("EnsureBenchmark update failed: %v", err)
+	}
+
+	var benchCfg string
+	if err := db.QueryRow("SELECT config FROM benchmarks WHERE id = ?", "bench-1").Scan(&benchCfg); err != nil {
+		t.Fatalf("failed to read benchmark row: %v", err)
+	}
+	if benchCfg != `{"models":["gpt-4o-mini"]}` {
+		t.Fatalf("benchmark config = %q, want %q", benchCfg, `{"models":["gpt-4o-mini"]}`)
+	}
+}
+
 func TestChainCRUD(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
