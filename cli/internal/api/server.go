@@ -87,6 +87,28 @@ func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, map[string]string{"error": message})
 }
 
+func safeJoinProjectPath(root, relPath string) (string, error) {
+	if strings.TrimSpace(relPath) == "" {
+		return "", fmt.Errorf("path is required")
+	}
+	if filepath.IsAbs(relPath) {
+		return "", fmt.Errorf("absolute paths are not allowed")
+	}
+
+	cleaned := filepath.Clean(relPath)
+	fullPath := filepath.Join(root, cleaned)
+
+	relative, err := filepath.Rel(root, fullPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to validate path: %w", err)
+	}
+	if relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes project root")
+	}
+
+	return fullPath, nil
+}
+
 // API Response types
 
 type PromptResponse struct {
@@ -257,7 +279,11 @@ func (s *Server) createPrompt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Write file to disk
-	filePath := filepath.Join(s.root, req.FilePath)
+	filePath, err := safeJoinProjectPath(s.root, req.FilePath)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create directory: %v", err))
 		return
