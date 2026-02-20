@@ -1065,6 +1065,10 @@ func (s *Server) getTestRun(w http.ResponseWriter, r *http.Request, testName str
 		writeError(w, http.StatusNotFound, fmt.Sprintf("test run '%s' not found", runID))
 		return
 	}
+	if run.SuiteID != testName {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("test run '%s' not found in suite '%s'", runID, testName))
+		return
+	}
 
 	writeJSON(w, http.StatusOK, TestRunResponse{
 		ID:          run.ID,
