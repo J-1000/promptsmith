@@ -446,6 +446,27 @@ func TestCreateTestSuiteRejectsPathTraversal(t *testing.T) {
 	}
 }
 
+func TestCreateTestSuitePersistsDBMapping(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name":"db-mapped-suite","prompt":"summarizer"}`
+	req := httptest.NewRequest("POST", "/api/tests", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+
+	var gotID string
+	if err := database.QueryRow("SELECT id FROM test_suites WHERE id = ?", "db-mapped-suite").Scan(&gotID); err != nil {
+		t.Fatalf("expected test suite row to be persisted: %v", err)
+	}
+}
+
 func TestListBenchmarks(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
@@ -515,6 +536,27 @@ func TestCreateBenchmarkSuiteRejectsPathTraversal(t *testing.T) {
 	outsidePath := filepath.Join(filepath.Dir(tmpDir), "escape.bench.yaml")
 	if _, err := os.Stat(outsidePath); !os.IsNotExist(err) {
 		t.Fatalf("outside file should not exist, err=%v", err)
+	}
+}
+
+func TestCreateBenchmarkSuitePersistsDBMapping(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	body := `{"name":"db-mapped-bench","prompt":"summarizer"}`
+	req := httptest.NewRequest("POST", "/api/benchmarks", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusCreated)
+	}
+
+	var gotID string
+	if err := database.QueryRow("SELECT id FROM benchmarks WHERE id = ?", "db-mapped-bench").Scan(&gotID); err != nil {
+		t.Fatalf("expected benchmark row to be persisted: %v", err)
 	}
 }
 

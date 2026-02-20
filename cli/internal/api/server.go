@@ -926,8 +926,24 @@ func (s *Server) runTest(w http.ResponseWriter, r *http.Request, testName string
 	if result.Failed > 0 {
 		status = "failed"
 	}
+	prompt, err := s.db.GetPromptByName(suite.Prompt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", suite.Prompt))
+		return
+	}
+	if err := s.db.EnsureTestSuite(testName, prompt.ID, testName, "{}"); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	resultsJSON, _ := json.Marshal(result)
-	s.db.SaveTestRun(testName, "", status, string(resultsJSON))
+	if _, err := s.db.SaveTestRun(testName, "", status, string(resultsJSON)); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	writeJSON(w, http.StatusOK, result)
 }
@@ -1001,6 +1017,10 @@ prompt: %s
 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
+		return
+	}
+	if err := s.db.EnsureTestSuite(req.Name, prompt.ID, req.Name, content); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -1208,6 +1228,10 @@ prompt: %s
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to write file: %v", err))
 		return
 	}
+	if err := s.db.EnsureBenchmark(req.Name, prompt.ID, content); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	relPath, _ := filepath.Rel(s.root, filePath)
 	writeJSON(w, http.StatusCreated, BenchmarkSuiteResponse{
@@ -1322,8 +1346,24 @@ func (s *Server) runBenchmark(w http.ResponseWriter, r *http.Request, benchName 
 	}
 
 	// Persist run results
+	prompt, err := s.db.GetPromptByName(suite.Prompt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if prompt == nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("prompt '%s' not found", suite.Prompt))
+		return
+	}
+	if err := s.db.EnsureBenchmark(benchName, prompt.ID, "{}"); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 	resultsJSON, _ := json.Marshal(result)
-	s.db.SaveBenchmarkRun(benchName, "", string(resultsJSON))
+	if _, err := s.db.SaveBenchmarkRun(benchName, "", string(resultsJSON)); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	writeJSON(w, http.StatusOK, result)
 }
