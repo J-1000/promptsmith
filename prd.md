@@ -8,6 +8,16 @@
 
 PromptSmith is a developer-focused tool that brings software engineering best practices to prompt engineering. It combines a web dashboard with a powerful CLI, enabling teams to version, test, iterate, and benchmark their LLM prompts with the same rigor they apply to code.
 
+### Current Implementation Status (2026-02-20)
+
+- Recently completed security and integrity fixes:
+  - Path traversal protection for API file creation endpoints (prompts/tests/benchmarks)
+  - Path traversal protection for cloud pull file paths in CLI
+  - Atomic prompt creation behavior (DB rollback on filesystem failures)
+  - Suite-scoped validation for test run detail endpoint
+  - Persisted `test_suites` / `benchmarks` mappings used by dashboard joins
+- Regression coverage was added for each area above in API/DB/cmd tests.
+
 ---
 
 ## Problem Statement
