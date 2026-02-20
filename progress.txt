@@ -8,6 +8,26 @@ Summary (Phase 11 complete):
   - API: 35+ endpoints (full CRUD + history + comments + playground + dashboard + chains)
   - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
+Recent Updates (2026-02-20):
+  [x] Security hardening: blocked path traversal on API file writes (prompts/tests/benchmarks)
+  [x] Security hardening: blocked path traversal in `promptsmith pull` remote file paths
+  [x] Reliability: prompt create now rolls back DB row when filesystem write fails
+  [x] API correctness: test run lookup now scoped to requested suite (`/api/tests/:id/runs/:runId`)
+  [x] Data integrity: test/benchmark suite mappings now persisted for dashboard joins
+  [x] Added regression tests for all fixes above
+
+Commits (latest review/fix pass):
+  - 5186ca1 api: block prompt file path traversal
+  - c919c99 api: block traversal in test and benchmark suite creation
+  - bd3785a cmd: add project-root path safety helper
+  - dddf8b8 pull: reject remote prompt paths outside project root
+  - e607760 api: rollback prompt row when file write fails
+  - d0a46ef api: test prompt create rollback on fs failure
+  - 80548d7 api: scope test run lookup to requested suite
+  - 824e05b api: add suite mismatch test for test-run endpoint
+  - aa0eacd db: add upsert helpers for suites and benchmarks
+  - 50483af api: persist suite and benchmark mappings for run joins
+
 Phase 1: Foundation — CLI Only [COMPLETE]
 -----------------------------------------
 
