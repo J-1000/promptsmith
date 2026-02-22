@@ -330,7 +330,7 @@ func (s *Server) createPrompt(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listPrompts(w http.ResponseWriter, r *http.Request) {
-	prompts, err := s.db.ListPrompts()
+	prompts, err := s.db.ListPromptsWithLatestVersion()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -338,21 +338,14 @@ func (s *Server) listPrompts(w http.ResponseWriter, r *http.Request) {
 
 	response := make([]PromptResponse, 0, len(prompts))
 	for _, p := range prompts {
-		pr := PromptResponse{
+		response = append(response, PromptResponse{
 			ID:          p.ID,
 			Name:        p.Name,
 			Description: p.Description,
 			FilePath:    p.FilePath,
+			Version:     p.LatestVersion,
 			CreatedAt:   p.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		}
-
-		// Get latest version
-		latestVersion, err := s.db.GetLatestVersion(p.ID)
-		if err == nil && latestVersion != nil {
-			pr.Version = latestVersion.Version
-		}
-
-		response = append(response, pr)
+		})
 	}
 
 	writeJSON(w, http.StatusOK, response)
