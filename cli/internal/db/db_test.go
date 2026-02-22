@@ -596,6 +596,34 @@ func TestChainCRUD(t *testing.T) {
 	}
 }
 
+func TestListChainsWithStepCounts(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	chainA, _ := db.CreateChain(project.ID, "alpha-chain", "")
+	chainB, _ := db.CreateChain(project.ID, "beta-chain", "")
+
+	_, _ = db.CreateChainStep(chainA.ID, 1, "summarize", `{}`, "summary")
+	_, _ = db.CreateChainStep(chainA.ID, 2, "translate", `{}`, "translation")
+	_, _ = db.CreateChainStep(chainB.ID, 1, "classify", `{}`, "label")
+
+	chains, err := db.ListChainsWithStepCounts()
+	if err != nil {
+		t.Fatalf("ListChainsWithStepCounts failed: %v", err)
+	}
+	if len(chains) != 2 {
+		t.Fatalf("expected 2 chains, got %d", len(chains))
+	}
+
+	if chains[0].Name != "alpha-chain" || chains[0].StepCount != 2 {
+		t.Fatalf("alpha-chain step_count = %d, want 2", chains[0].StepCount)
+	}
+	if chains[1].Name != "beta-chain" || chains[1].StepCount != 1 {
+		t.Fatalf("beta-chain step_count = %d, want 1", chains[1].StepCount)
+	}
+}
+
 func TestChainSteps(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()

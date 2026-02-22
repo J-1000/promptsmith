@@ -100,6 +100,11 @@ type Chain struct {
 	UpdatedAt   time.Time
 }
 
+type ChainWithStepCount struct {
+	Chain
+	StepCount int
+}
+
 type ChainStep struct {
 	ID           string
 	ChainID      string
@@ -1112,6 +1117,32 @@ func (db *DB) ListChains() ([]*Chain, error) {
 	for rows.Next() {
 		var c Chain
 		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.ProjectID, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		chains = append(chains, &c)
+	}
+	return chains, nil
+}
+
+func (db *DB) ListChainsWithStepCounts() ([]*ChainWithStepCount, error) {
+	rows, err := db.Query(`
+		SELECT
+			c.id, c.name, c.description, c.project_id, c.created_at, c.updated_at,
+			COUNT(cs.id) AS step_count
+		FROM chains c
+		LEFT JOIN chain_steps cs ON cs.chain_id = c.id
+		GROUP BY c.id, c.name, c.description, c.project_id, c.created_at, c.updated_at
+		ORDER BY c.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chains []*ChainWithStepCount
+	for rows.Next() {
+		var c ChainWithStepCount
+		if err := rows.Scan(&c.ID, &c.Name, &c.Description, &c.ProjectID, &c.CreatedAt, &c.UpdatedAt, &c.StepCount); err != nil {
 			return nil, err
 		}
 		chains = append(chains, &c)
