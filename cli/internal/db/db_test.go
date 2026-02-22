@@ -156,6 +156,34 @@ func TestListPrompts(t *testing.T) {
 	}
 }
 
+func TestListPromptsWithLatestVersion(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	alpha, _ := db.CreatePrompt(project.ID, "alpha", "", "prompts/alpha.prompt")
+	beta, _ := db.CreatePrompt(project.ID, "beta", "", "prompts/beta.prompt")
+
+	v1, _ := db.CreateVersion(alpha.ID, "1.0.0", "alpha v1", "[]", "{}", "Initial", "user", nil)
+	db.CreateVersion(alpha.ID, "1.0.1", "alpha v2", "[]", "{}", "Update", "user", &v1.ID)
+	db.CreateVersion(beta.ID, "2.0.0", "beta v1", "[]", "{}", "Initial", "user", nil)
+
+	prompts, err := db.ListPromptsWithLatestVersion()
+	if err != nil {
+		t.Fatalf("ListPromptsWithLatestVersion failed: %v", err)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("expected 2 prompts, got %d", len(prompts))
+	}
+
+	if prompts[0].Name != "alpha" || prompts[0].LatestVersion != "1.0.1" {
+		t.Fatalf("alpha latest = %q, want %q", prompts[0].LatestVersion, "1.0.1")
+	}
+	if prompts[1].Name != "beta" || prompts[1].LatestVersion != "2.0.0" {
+		t.Fatalf("beta latest = %q, want %q", prompts[1].LatestVersion, "2.0.0")
+	}
+}
+
 func TestCreateAndGetVersions(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()

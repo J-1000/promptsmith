@@ -38,6 +38,11 @@ type Prompt struct {
 	CreatedAt   time.Time
 }
 
+type PromptWithLatestVersion struct {
+	Prompt
+	LatestVersion string
+}
+
 type PromptVersion struct {
 	ID              string
 	PromptID        string
@@ -393,6 +398,40 @@ func (db *DB) ListPrompts() ([]*Prompt, error) {
 		var p Prompt
 		if err := rows.Scan(&p.ID, &p.ProjectID, &p.Name, &p.Description, &p.FilePath, &p.CreatedAt); err != nil {
 			return nil, err
+		}
+		prompts = append(prompts, &p)
+	}
+	return prompts, nil
+}
+
+func (db *DB) ListPromptsWithLatestVersion() ([]*PromptWithLatestVersion, error) {
+	rows, err := db.Query(`
+		SELECT
+			p.id, p.project_id, p.name, p.description, p.file_path, p.created_at,
+			(
+				SELECT pv.version
+				FROM prompt_versions pv
+				WHERE pv.prompt_id = p.id
+				ORDER BY pv.created_at DESC
+				LIMIT 1
+			) AS latest_version
+		FROM prompts p
+		ORDER BY p.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var prompts []*PromptWithLatestVersion
+	for rows.Next() {
+		var p PromptWithLatestVersion
+		var latestVersion sql.NullString
+		if err := rows.Scan(&p.ID, &p.ProjectID, &p.Name, &p.Description, &p.FilePath, &p.CreatedAt, &latestVersion); err != nil {
+			return nil, err
+		}
+		if latestVersion.Valid {
+			p.LatestVersion = latestVersion.String
 		}
 		prompts = append(prompts, &p)
 	}
