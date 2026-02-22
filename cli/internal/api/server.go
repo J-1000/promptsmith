@@ -1949,7 +1949,7 @@ func (s *Server) handleChains(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listChains(w http.ResponseWriter, r *http.Request) {
-	chains, err := s.db.ListChains()
+	chains, err := s.db.ListChainsWithStepCounts()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1957,12 +1957,11 @@ func (s *Server) listChains(w http.ResponseWriter, r *http.Request) {
 
 	response := make([]ChainResponse, 0, len(chains))
 	for _, c := range chains {
-		steps, _ := s.db.ListChainSteps(c.ID)
 		response = append(response, ChainResponse{
 			ID:          c.ID,
 			Name:        c.Name,
 			Description: c.Description,
-			StepCount:   len(steps),
+			StepCount:   c.StepCount,
 			CreatedAt:   c.CreatedAt.Format("2006-01-02T15:04:05Z"),
 			UpdatedAt:   c.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		})
