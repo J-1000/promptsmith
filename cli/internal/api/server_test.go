@@ -1822,3 +1822,51 @@ func TestSyncConfigConfigured(t *testing.T) {
 		t.Error("auto_push = false, want true")
 	}
 }
+
+func TestListChainsIncludesStepCounts(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	project, err := database.GetProject()
+	if err != nil {
+		t.Fatalf("failed to get project: %v", err)
+	}
+	if project == nil {
+		t.Fatal("expected project to exist")
+	}
+
+	chain, err := database.CreateChain(project.ID, "content-pipeline", "pipeline")
+	if err != nil {
+		t.Fatalf("failed to create chain: %v", err)
+	}
+	if _, err := database.CreateChainStep(chain.ID, 1, "summarizer", `{"text":"{{input.text}}"}`, "summary"); err != nil {
+		t.Fatalf("failed to create chain step: %v", err)
+	}
+	if _, err := database.CreateChainStep(chain.ID, 2, "summarizer", `{"text":"{{steps.summary.output}}"}`, "rewrite"); err != nil {
+		t.Fatalf("failed to create chain step: %v", err)
+	}
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/chains", nil)
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var response []ChainResponse
+	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if len(response) != 1 {
+		t.Fatalf("expected 1 chain, got %d", len(response))
+	}
+	if response[0].Name != "content-pipeline" {
+		t.Errorf("name = %q, want %q", response[0].Name, "content-pipeline")
+	}
+	if response[0].StepCount != 2 {
+		t.Errorf("step_count = %d, want %d", response[0].StepCount, 2)
+	}
+}
