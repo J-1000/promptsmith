@@ -123,6 +123,16 @@ func TestListPrompts(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
 
+	prompt, err := database.GetPromptByName("summarizer")
+	if err != nil {
+		t.Fatalf("failed to get prompt: %v", err)
+	}
+	if prompt == nil {
+		t.Fatal("expected setup prompt to exist")
+	}
+	v1, _ := database.CreateVersion(prompt.ID, "1.0.0", "content v1", "[]", "{}", "Initial", "user", nil)
+	_, _ = database.CreateVersion(prompt.ID, "1.0.1", "content v2", "[]", "{}", "Update", "user", &v1.ID)
+
 	server := NewServer(database, tmpDir)
 
 	req := httptest.NewRequest("GET", "/api/prompts", nil)
@@ -145,6 +155,9 @@ func TestListPrompts(t *testing.T) {
 
 	if len(response) > 0 && response[0].Name != "summarizer" {
 		t.Errorf("prompt name = %q, want %q", response[0].Name, "summarizer")
+	}
+	if len(response) > 0 && response[0].Version != "1.0.1" {
+		t.Errorf("prompt version = %q, want %q", response[0].Version, "1.0.1")
 	}
 }
 
