@@ -19,7 +19,16 @@ vi.mock('../api', () => ({
   listBenchmarks: vi.fn(),
 }))
 
-import { getPrompt, getPromptVersions, getPromptDiff, deletePrompt, listTests, listBenchmarks } from '../api'
+import {
+  getPrompt,
+  getPromptVersions,
+  getPromptDiff,
+  deletePrompt,
+  runTest,
+  runBenchmark,
+  listTests,
+  listBenchmarks,
+} from '../api'
 
 const mockPrompt = {
   id: '1',
@@ -263,6 +272,79 @@ describe('PromptPage', () => {
       expect(screen.getByText('Change Impact')).toBeInTheDocument()
       expect(screen.getByText('greeting-tests')).toBeInTheDocument()
       expect(screen.getByText('greeting-bench')).toBeInTheDocument()
+    })
+  })
+
+  it('runs tests using suite name mapped to prompt', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listTests).mockResolvedValue([
+      { name: 'greeting-suite', file_path: 'tests/greeting.test.yaml', prompt: 'greeting', test_count: 2 },
+    ])
+    vi.mocked(runTest).mockResolvedValue({
+      suite_name: 'greeting-suite',
+      prompt_name: 'greeting',
+      version: '1.0.2',
+      passed: 2,
+      failed: 0,
+      skipped: 0,
+      total: 2,
+      results: [],
+      duration_ms: 123,
+    })
+
+    renderWithRouter('/prompt/greeting')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /tests/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^Tests/i }))
+    await user.click(screen.getByRole('button', { name: 'Run Tests' }))
+
+    await waitFor(() => {
+      expect(runTest).toHaveBeenCalledWith('greeting-suite')
+    })
+  })
+
+  it('runs benchmark using suite name mapped to prompt', async () => {
+    const user = userEvent.setup()
+    vi.mocked(listBenchmarks).mockResolvedValue([
+      {
+        name: 'greeting-bench',
+        file_path: 'benchmarks/greeting.bench.yaml',
+        prompt: 'greeting',
+        models: ['gpt-4o-mini'],
+        runs_per_model: 2,
+      },
+    ])
+    vi.mocked(runBenchmark).mockResolvedValue({
+      suite_name: 'greeting-bench',
+      prompt_name: 'greeting',
+      version: '1.0.2',
+      models: [
+        {
+          model: 'gpt-4o-mini',
+          runs: 2,
+          errors: 0,
+          error_rate: 0,
+          latency_p50_ms: 100,
+          latency_p99_ms: 120,
+          total_tokens_avg: 50,
+          cost_per_request: 0.001,
+        },
+      ],
+      duration_ms: 456,
+    })
+
+    renderWithRouter('/prompt/greeting')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /benchmarks/i })).toBeInTheDocument()
+    })
+
+    await user.click(screen.getByRole('button', { name: /^Benchmarks/i }))
+    await user.click(screen.getByRole('button', { name: 'Run Benchmark' }))
+
+    await waitFor(() => {
+      expect(runBenchmark).toHaveBeenCalledWith('greeting-bench')
     })
   })
 

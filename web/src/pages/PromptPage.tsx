@@ -98,6 +98,20 @@ export function PromptPage() {
     setVersions(versionDisplays)
   }
 
+  const loadRelatedTests = async (promptName: string): Promise<TestSuite[]> => {
+    const suites = await listTests()
+    const related = suites.filter((suite) => suite.prompt === promptName)
+    setAffectedTests(related)
+    return related
+  }
+
+  const loadRelatedBenchmarks = async (promptName: string): Promise<BenchmarkSuite[]> => {
+    const suites = await listBenchmarks()
+    const related = suites.filter((suite) => suite.prompt === promptName)
+    setAffectedBenchmarks(related)
+    return related
+  }
+
   const handleAddTag = async (versionId: string) => {
     if (!name || !newTagName.trim()) return
     try {
@@ -175,16 +189,24 @@ export function PromptPage() {
   }, [selectedVersions, name])
 
   useEffect(() => {
-    if (view !== 'diff' || !name) return
-    listTests().then((suites) => setAffectedTests(suites.filter(s => s.prompt === name))).catch(() => {})
-    listBenchmarks().then((suites) => setAffectedBenchmarks(suites.filter(s => s.prompt === name))).catch(() => {})
+    if (!name) return
+    if (view !== 'diff' && view !== 'tests' && view !== 'benchmarks') return
+
+    loadRelatedTests(name).catch(() => {})
+    loadRelatedBenchmarks(name).catch(() => {})
   }, [view, name])
 
   const handleRunTests = async () => {
     if (!name) return
     setIsRunningTests(true)
     try {
-      const result = await runTest(name)
+      const suites = affectedTests.length > 0 ? affectedTests : await loadRelatedTests(name)
+      if (suites.length === 0) {
+        setToast({ message: 'No test suites found for this prompt', type: 'info' })
+        return
+      }
+
+      const result = await runTest(suites[0].name)
       setTestResults({
         suiteName: result.suite_name,
         promptName: result.prompt_name,
@@ -220,7 +242,13 @@ export function PromptPage() {
     if (!name) return
     setIsRunningBenchmark(true)
     try {
-      const result = await runBenchmark(name)
+      const suites = affectedBenchmarks.length > 0 ? affectedBenchmarks : await loadRelatedBenchmarks(name)
+      if (suites.length === 0) {
+        setToast({ message: 'No benchmark suites found for this prompt', type: 'info' })
+        return
+      }
+
+      const result = await runBenchmark(suites[0].name)
       setBenchmarkResults({
         suiteName: result.suite_name,
         promptName: result.prompt_name,
