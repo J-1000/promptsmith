@@ -8,6 +8,21 @@ Summary (Phase 11 complete):
   - API: 35+ endpoints (full CRUD + history + comments + playground + dashboard + chains)
   - Docs: LICENSE (MIT), CONTRIBUTING.md, VitePress docs site
 
+Recent Updates (2026-02-22):
+  [x] PromptPage: run tests/benchmarks now resolves related suite names (no implicit prompt==suite assumption)
+  [x] API perf: `/api/prompts` now returns latest versions via one DB query (removed per-prompt lookup loop)
+  [x] API perf: `/api/chains` now returns step counts via one DB query (removed per-chain lookup loop)
+  [x] Added DB/API regression tests for prompt latest-version listing and chain step-count listing
+
+Commits (2026-02-22 docs/review pass):
+  - c919c89 web: run prompt tests/benchmarks via related suite names
+  - b45dc68 db: add prompt list query with latest version
+  - d012db2 api: use prompt list latest-version query in list endpoint
+  - a536051 api-test: verify prompt list includes latest version
+  - c67ca88 db: add chain list query with step counts
+  - 4ad461a api: use chain list step-count query in list endpoint
+  - 1f54007 api-test: verify chain list includes step counts
+
 Recent Updates (2026-02-20):
   [x] Security hardening: blocked path traversal on API file writes (prompts/tests/benchmarks)
   [x] Security hardening: blocked path traversal in `promptsmith pull` remote file paths
