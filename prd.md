@@ -17,6 +17,11 @@ PromptSmith is a developer-focused tool that brings software engineering best pr
   - Suite-scoped validation for test run detail endpoint
   - Persisted `test_suites` / `benchmarks` mappings used by dashboard joins
 - Regression coverage was added for each area above in API/DB/cmd tests.
+- Additional updates completed on 2026-02-22:
+  - Prompt page run actions now resolve and execute mapped test/benchmark suite names
+  - `/api/prompts` list path optimized to fetch latest versions in a single DB query
+  - `/api/chains` list path optimized to fetch step counts in a single DB query
+  - Added API/DB regression coverage for prompt latest-version listing and chain step-count listing
 
 ---
 
