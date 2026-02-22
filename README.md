@@ -4,6 +4,13 @@
 
 PromptSmith brings software engineering best practices to prompt engineering. Version, test, iterate, and benchmark your LLM prompts with the same rigor you apply to code.
 
+## Recent Updates (2026-02-22)
+
+- Prompt page run actions now execute the correct mapped test/benchmark suite names instead of assuming suite name equals prompt name.
+- Prompt listing API now fetches latest version in a single DB query (removed per-prompt lookup loop).
+- Chain listing API now fetches step counts in a single DB query (removed per-chain lookup loop).
+- Added regression tests for prompt latest-version listing and chain step-count listing behavior.
+
 ## Features
 
 - **Version Control** — Git-like versioning with semantic versions (`prompt@1.2.3`)
