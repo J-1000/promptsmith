@@ -47,7 +47,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	cyan := color.New(color.FgCyan).SprintFunc()
 	dim := color.New(color.Faint).SprintFunc()
 
-	addr := fmt.Sprintf(":%d", servePort)
+	addr := fmt.Sprintf("127.0.0.1:%d", servePort)
 	fmt.Printf("%s API server started\n", cyan("▶"))
 	fmt.Printf("  Local:   %s\n", cyan(fmt.Sprintf("http://localhost:%d", servePort)))
 	fmt.Printf("  Project: %s\n", dim(projectRoot))

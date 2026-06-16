@@ -77,7 +77,7 @@ func TestServerRoutes(t *testing.T) {
 		{"GET", "/api/tests", http.StatusOK},
 		{"GET", "/api/benchmarks", http.StatusOK},
 		{"POST", "/api/project", http.StatusMethodNotAllowed},
-		{"OPTIONS", "/api/prompts", http.StatusOK}, // CORS preflight
+		{"OPTIONS", "/api/prompts", http.StatusNoContent}, // CORS preflight
 	}
 
 	for _, tt := range tests {
@@ -375,16 +375,55 @@ func TestCORSHeaders(t *testing.T) {
 	server := NewServer(database, tmpDir)
 
 	req := httptest.NewRequest("GET", "/api/prompts", nil)
+	req.Header.Set("Origin", "http://localhost:8081")
 	rec := httptest.NewRecorder()
 
 	server.ServeHTTP(rec, req)
 
 	// Check CORS headers
-	if rec.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("missing Access-Control-Allow-Origin header")
+	if rec.Header().Get("Access-Control-Allow-Origin") != "http://localhost:8081" {
+		t.Errorf("Access-Control-Allow-Origin = %q, want allowed origin", rec.Header().Get("Access-Control-Allow-Origin"))
 	}
 	if rec.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("missing Access-Control-Allow-Methods header")
+	}
+}
+
+func TestCORSRejectsDisallowedOrigin(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	req := httptest.NewRequest("GET", "/api/prompts", nil)
+	req.Header.Set("Origin", "https://example.com")
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if rec.Header().Get("Access-Control-Allow-Origin") != "" {
+		t.Fatalf("unexpected Access-Control-Allow-Origin header %q", rec.Header().Get("Access-Control-Allow-Origin"))
+	}
+}
+
+func TestRejectsOversizedRequestBody(t *testing.T) {
+	tmpDir, database, cleanup := setupTestProject(t)
+	defer cleanup()
+
+	server := NewServer(database, tmpDir)
+
+	oversizedContent := strings.Repeat("x", int(maxRequestBodyBytes))
+	body := `{"name":"too-big","content":"` + oversizedContent + `"}`
+	req := httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 }
 

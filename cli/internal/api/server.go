@@ -24,6 +24,15 @@ type Server struct {
 	mux  *http.ServeMux
 }
 
+const maxRequestBodyBytes int64 = 10 << 20 // 10 MiB
+
+var allowedCORSOrigins = map[string]struct{}{
+	"http://localhost:8080": {},
+	"http://127.0.0.1:8080": {},
+	"http://localhost:8081": {},
+	"http://127.0.0.1:8081": {},
+}
+
 func NewServer(database *db.DB, projectRoot string) *Server {
 	s := &Server{
 		db:   database,
@@ -56,13 +65,25 @@ func (s *Server) setupRoutes() {
 
 func (s *Server) corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if _, ok := allowedCORSOrigins[origin]; !ok {
+				writeError(w, http.StatusForbidden, "origin not allowed")
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+		}
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(http.StatusNoContent)
 			return
+		}
+
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodyBytes)
 		}
 
 		next(w, r)
@@ -74,7 +95,15 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ListenAndServe(addr string) error {
-	return http.ListenAndServe(addr, s)
+	server := &http.Server{
+		Addr:              addr,
+		Handler:           s,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	return server.ListenAndServe()
 }
 
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
@@ -143,12 +172,12 @@ type TestSuiteResponse struct {
 }
 
 type BenchmarkSuiteResponse struct {
-	Name        string   `json:"name"`
-	FilePath    string   `json:"file_path"`
-	Prompt      string   `json:"prompt"`
-	Description string   `json:"description,omitempty"`
-	Models      []string `json:"models"`
-	RunsPerModel int     `json:"runs_per_model"`
+	Name         string   `json:"name"`
+	FilePath     string   `json:"file_path"`
+	Prompt       string   `json:"prompt"`
+	Description  string   `json:"description,omitempty"`
+	Models       []string `json:"models"`
+	RunsPerModel int      `json:"runs_per_model"`
 }
 
 // Handlers
@@ -1468,15 +1497,6 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGenerateAlias(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
@@ -1876,12 +1896,12 @@ type ChainResponse struct {
 }
 
 type ChainDetailResponse struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Description string             `json:"description"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Description string              `json:"description"`
 	Steps       []ChainStepResponse `json:"steps"`
-	CreatedAt   string             `json:"created_at"`
-	UpdatedAt   string             `json:"updated_at"`
+	CreatedAt   string              `json:"created_at"`
+	UpdatedAt   string              `json:"updated_at"`
 }
 
 type ChainStepResponse struct {
