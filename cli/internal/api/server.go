@@ -26,6 +26,17 @@ type Server struct {
 
 const maxRequestBodyBytes int64 = 10 << 20 // 10 MiB
 
+// llmRequestTimeout bounds long-running LLM operations (benchmarks, generation,
+// playground and chain runs) triggered by an API request.
+const llmRequestTimeout = 5 * time.Minute
+
+// llmContext derives a bounded context from the request so that work is
+// cancelled when the client disconnects or the deadline elapses, rather than
+// running unbounded with context.Background().
+func llmContext(r *http.Request) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(r.Context(), llmRequestTimeout)
+}
+
 var allowedCORSOrigins = map[string]struct{}{
 	"http://localhost:8080": {},
 	"http://127.0.0.1:8080": {},
@@ -1361,7 +1372,9 @@ func (s *Server) runBenchmark(w http.ResponseWriter, r *http.Request, benchName 
 
 	// Run the benchmark suite
 	runner := benchmark.NewRunner(s.db, registry)
-	result, err := runner.Run(context.Background(), suite)
+	ctx, cancel := llmContext(r)
+	defer cancel()
+	result, err := runner.Run(ctx, suite)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -1480,7 +1493,9 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gen := generator.New(provider)
-	result, err := gen.Generate(context.Background(), generator.GenerateRequest{
+	ctx, cancel := llmContext(r)
+	defer cancel()
+	result, err := gen.Generate(ctx, generator.GenerateRequest{
 		Type:   generator.GenerationType(req.Type),
 		Prompt: req.Prompt,
 		Count:  req.Count,
@@ -1744,8 +1759,10 @@ func (s *Server) handlePlaygroundRun(w http.ResponseWriter, r *http.Request) {
 		temperature = *req.Temperature
 	}
 
+	ctx, cancel := llmContext(r)
+	defer cancel()
 	start := time.Now()
-	resp, err := provider.Complete(context.Background(), benchmark.CompletionRequest{
+	resp, err := provider.Complete(ctx, benchmark.CompletionRequest{
 		Model:       req.Model,
 		Prompt:      rendered,
 		MaxTokens:   maxTokens,
@@ -2295,7 +2312,11 @@ func (s *Server) handleChainRun(w http.ResponseWriter, r *http.Request, chainNam
 		return
 	}
 
-	// Execute chain steps
+	// Execute chain steps. A single bounded context spans the whole run so a
+	// hung step cannot block the request indefinitely.
+	ctx, cancel := llmContext(r)
+	defer cancel()
+
 	stepOutputs := make(map[string]string)
 	var stepResults []ChainStepRunResult
 	var finalOutput string
@@ -2333,7 +2354,7 @@ func (s *Server) handleChainRun(w http.ResponseWriter, r *http.Request, chainNam
 		}
 
 		start := time.Now()
-		resp, err := provider.Complete(context.Background(), benchmark.CompletionRequest{
+		resp, err := provider.Complete(ctx, benchmark.CompletionRequest{
 			Model:       req.Model,
 			Prompt:      rendered,
 			MaxTokens:   1024,
