@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	DefaultRemote   = "https://api.promptsmith.dev"
-	TokenFileName   = "token"
-	TokenEnvVar     = "PROMPTSMITH_TOKEN"
+	DefaultRemote = "https://api.promptsmith.dev"
+	TokenFileName = "token"
+	TokenEnvVar   = "PROMPTSMITH_TOKEN"
 )
 
 type Client struct {
@@ -36,11 +36,11 @@ type UserInfo struct {
 }
 
 type Project struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Team        string    `json:"team,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Team      string    `json:"team,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Prompt struct {

@@ -264,7 +264,7 @@ func TestEstimateTokens(t *testing.T) {
 		expected int
 	}{
 		{"", 0},
-		{"hello world", 2},  // 11 chars / 4 = 2
+		{"hello world", 2}, // 11 chars / 4 = 2
 		{"This is a longer text with more words", 9}, // 38 chars / 4 = 9
 	}
 

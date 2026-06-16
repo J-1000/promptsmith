@@ -16,8 +16,8 @@ type mockProvider struct {
 	block    bool // when true, Complete blocks until the context is cancelled
 }
 
-func (m *mockProvider) Name() string { return m.name }
-func (m *mockProvider) Models() []string { return []string{"gpt-4o-mini"} }
+func (m *mockProvider) Name() string                    { return m.name }
+func (m *mockProvider) Models() []string                { return []string{"gpt-4o-mini"} }
 func (m *mockProvider) SupportsModel(model string) bool { return true }
 func (m *mockProvider) Complete(ctx context.Context, req benchmark.CompletionRequest) (*benchmark.CompletionResponse, error) {
 	if m.block {

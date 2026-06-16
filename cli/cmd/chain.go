@@ -287,10 +287,10 @@ func runChainRun(cmd *cobra.Command, args []string) error {
 
 	stepOutputs := make(map[string]string)
 	type stepResult struct {
-		Step    int    `json:"step"`
-		Prompt  string `json:"prompt"`
-		Output  string `json:"output"`
-		Key     string `json:"output_key"`
+		Step   int    `json:"step"`
+		Prompt string `json:"prompt"`
+		Output string `json:"output"`
+		Key    string `json:"output_key"`
 	}
 	var results []stepResult
 

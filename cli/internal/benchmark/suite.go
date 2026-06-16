@@ -9,15 +9,15 @@ import (
 
 // Suite defines a benchmark configuration for a prompt
 type Suite struct {
-	Name        string   `yaml:"name" json:"name"`
-	Prompt      string   `yaml:"prompt" json:"prompt"`
-	Description string   `yaml:"description,omitempty" json:"description,omitempty"`
-	Version     string   `yaml:"version,omitempty" json:"version,omitempty"`
-	Models      []string `yaml:"models" json:"models"`
-	Dataset     string   `yaml:"dataset,omitempty" json:"dataset,omitempty"`
-	RunsPerModel int     `yaml:"runs_per_model,omitempty" json:"runs_per_model,omitempty"`
-	Metrics     []Metric `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	Variables   map[string]any `yaml:"variables,omitempty" json:"variables,omitempty"`
+	Name         string         `yaml:"name" json:"name"`
+	Prompt       string         `yaml:"prompt" json:"prompt"`
+	Description  string         `yaml:"description,omitempty" json:"description,omitempty"`
+	Version      string         `yaml:"version,omitempty" json:"version,omitempty"`
+	Models       []string       `yaml:"models" json:"models"`
+	Dataset      string         `yaml:"dataset,omitempty" json:"dataset,omitempty"`
+	RunsPerModel int            `yaml:"runs_per_model,omitempty" json:"runs_per_model,omitempty"`
+	Metrics      []Metric       `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Variables    map[string]any `yaml:"variables,omitempty" json:"variables,omitempty"`
 }
 
 // Metric defines what to measure in the benchmark
@@ -31,32 +31,32 @@ type Metric struct {
 type MetricType string
 
 const (
-	MetricLatency       MetricType = "latency"
-	MetricTokens        MetricType = "tokens"
-	MetricCost          MetricType = "cost"
-	MetricQuality       MetricType = "quality"
-	MetricLatencyP50    MetricType = "latency_p50"
-	MetricLatencyP99    MetricType = "latency_p99"
-	MetricTotalTokens   MetricType = "total_tokens"
-	MetricPromptTokens  MetricType = "prompt_tokens"
-	MetricOutputTokens  MetricType = "output_tokens"
-	MetricCostPerReq    MetricType = "cost_per_request"
+	MetricLatency      MetricType = "latency"
+	MetricTokens       MetricType = "tokens"
+	MetricCost         MetricType = "cost"
+	MetricQuality      MetricType = "quality"
+	MetricLatencyP50   MetricType = "latency_p50"
+	MetricLatencyP99   MetricType = "latency_p99"
+	MetricTotalTokens  MetricType = "total_tokens"
+	MetricPromptTokens MetricType = "prompt_tokens"
+	MetricOutputTokens MetricType = "output_tokens"
+	MetricCostPerReq   MetricType = "cost_per_request"
 )
 
 // ModelResult holds benchmark results for a single model
 type ModelResult struct {
-	Model          string  `json:"model"`
-	Runs           int     `json:"runs"`
-	LatencyP50Ms   float64 `json:"latency_p50_ms"`
-	LatencyP99Ms   float64 `json:"latency_p99_ms"`
-	LatencyAvgMs   float64 `json:"latency_avg_ms"`
-	TotalTokensAvg float64 `json:"total_tokens_avg"`
-	PromptTokens   int     `json:"prompt_tokens"`
+	Model           string  `json:"model"`
+	Runs            int     `json:"runs"`
+	LatencyP50Ms    float64 `json:"latency_p50_ms"`
+	LatencyP99Ms    float64 `json:"latency_p99_ms"`
+	LatencyAvgMs    float64 `json:"latency_avg_ms"`
+	TotalTokensAvg  float64 `json:"total_tokens_avg"`
+	PromptTokens    int     `json:"prompt_tokens"`
 	OutputTokensAvg float64 `json:"output_tokens_avg"`
-	CostPerRequest float64 `json:"cost_per_request"`
-	TotalCost      float64 `json:"total_cost"`
-	Errors         int     `json:"errors"`
-	ErrorRate      float64 `json:"error_rate"`
+	CostPerRequest  float64 `json:"cost_per_request"`
+	TotalCost       float64 `json:"total_cost"`
+	Errors          int     `json:"errors"`
+	ErrorRate       float64 `json:"error_rate"`
 }
 
 // RunResult holds individual run data
@@ -73,14 +73,14 @@ type RunResult struct {
 
 // BenchmarkResult holds the complete benchmark results
 type BenchmarkResult struct {
-	SuiteName   string         `json:"suite_name"`
-	PromptName  string         `json:"prompt_name"`
-	Version     string         `json:"version"`
-	Models      []ModelResult  `json:"models"`
-	Runs        []RunResult    `json:"runs,omitempty"`
-	DurationMs  int64          `json:"duration_ms"`
-	StartedAt   string         `json:"started_at"`
-	CompletedAt string         `json:"completed_at"`
+	SuiteName   string        `json:"suite_name"`
+	PromptName  string        `json:"prompt_name"`
+	Version     string        `json:"version"`
+	Models      []ModelResult `json:"models"`
+	Runs        []RunResult   `json:"runs,omitempty"`
+	DurationMs  int64         `json:"duration_ms"`
+	StartedAt   string        `json:"started_at"`
+	CompletedAt string        `json:"completed_at"`
 }
 
 // ParseSuiteFile reads and parses a benchmark suite from a YAML file

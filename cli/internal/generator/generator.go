@@ -20,12 +20,12 @@ const (
 
 // GenerateRequest defines a request to generate prompt variations
 type GenerateRequest struct {
-	Type        GenerationType
-	Prompt      string            // The original prompt content
-	Count       int               // Number of variations to generate
-	Goal        string            // Optional goal (e.g., "reduce tokens", "improve clarity")
-	Model       string            // Model to use for generation
-	Options     map[string]string // Additional options
+	Type    GenerationType
+	Prompt  string            // The original prompt content
+	Count   int               // Number of variations to generate
+	Goal    string            // Optional goal (e.g., "reduce tokens", "improve clarity")
+	Model   string            // Model to use for generation
+	Options map[string]string // Additional options
 }
 
 // Variation represents a generated prompt variation
@@ -37,11 +37,11 @@ type Variation struct {
 
 // GenerateResult holds the results of a generation request
 type GenerateResult struct {
-	Original    string      `json:"original"`
-	Variations  []Variation `json:"variations"`
-	Model       string      `json:"model"`
-	Type        string      `json:"type"`
-	Goal        string      `json:"goal,omitempty"`
+	Original   string      `json:"original"`
+	Variations []Variation `json:"variations"`
+	Model      string      `json:"model"`
+	Type       string      `json:"type"`
+	Goal       string      `json:"goal,omitempty"`
 }
 
 // Generator generates prompt variations using an LLM

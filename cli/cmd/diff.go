@@ -37,10 +37,10 @@ func init() {
 }
 
 type diffOutput struct {
-	Prompt   string   `json:"prompt"`
-	Version1 string   `json:"version1"`
-	Version2 string   `json:"version2"`
-	Hunks    []hunk   `json:"hunks"`
+	Prompt   string `json:"prompt"`
+	Version1 string `json:"version1"`
+	Version2 string `json:"version2"`
+	Hunks    []hunk `json:"hunks"`
 }
 
 type hunk struct {

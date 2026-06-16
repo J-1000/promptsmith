@@ -106,18 +106,18 @@ variables:
 func TestModelResult(t *testing.T) {
 	// Verify ModelResult struct works correctly
 	result := ModelResult{
-		Model:          "gpt-4o",
-		Runs:           10,
-		LatencyP50Ms:   150.5,
-		LatencyP99Ms:   350.2,
-		LatencyAvgMs:   175.3,
-		TotalTokensAvg: 847.5,
-		PromptTokens:   200,
+		Model:           "gpt-4o",
+		Runs:            10,
+		LatencyP50Ms:    150.5,
+		LatencyP99Ms:    350.2,
+		LatencyAvgMs:    175.3,
+		TotalTokensAvg:  847.5,
+		PromptTokens:    200,
 		OutputTokensAvg: 647.5,
-		CostPerRequest: 0.0042,
-		TotalCost:      0.042,
-		Errors:         1,
-		ErrorRate:      0.1,
+		CostPerRequest:  0.0042,
+		TotalCost:       0.042,
+		Errors:          1,
+		ErrorRate:       0.1,
 	}
 
 	if result.Model != "gpt-4o" {

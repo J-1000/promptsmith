@@ -8,64 +8,64 @@ func TestScannerDetectsSecrets(t *testing.T) {
 	s := New()
 
 	tests := []struct {
-		name        string
-		content     string
-		expectType  string
-		shouldFind  bool
+		name       string
+		content    string
+		expectType string
+		shouldFind bool
 	}{
 		{
-			name:        "AWS Access Key",
-			content:     "aws_access_key = AKIAIOSFODNN7EXAMPLE",
-			expectType:  "AWS Access Key",
-			shouldFind:  true,
+			name:       "AWS Access Key",
+			content:    "aws_access_key = AKIAIOSFODNN7EXAMPLE",
+			expectType: "AWS Access Key",
+			shouldFind: true,
 		},
 		{
-			name:        "GitHub Token",
-			content:     "token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-			expectType:  "GitHub Token",
-			shouldFind:  true,
+			name:       "GitHub Token",
+			content:    "token: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			expectType: "GitHub Token",
+			shouldFind: true,
 		},
 		{
-			name:        "OpenAI API Key",
-			content:     "OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-			expectType:  "OpenAI API Key",
-			shouldFind:  true,
+			name:       "OpenAI API Key",
+			content:    "OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+			expectType: "OpenAI API Key",
+			shouldFind: true,
 		},
 		{
-			name:        "Private Key Header",
-			content:     "-----BEGIN RSA PRIVATE KEY-----",
-			expectType:  "Private Key",
-			shouldFind:  true,
+			name:       "Private Key Header",
+			content:    "-----BEGIN RSA PRIVATE KEY-----",
+			expectType: "Private Key",
+			shouldFind: true,
 		},
 		{
-			name:        "Generic API Key",
-			content:     `api_key = "abcdefghijklmnopqrstuvwxyz123456"`,
-			expectType:  "Generic Secret",
-			shouldFind:  true,
+			name:       "Generic API Key",
+			content:    `api_key = "abcdefghijklmnopqrstuvwxyz123456"`,
+			expectType: "Generic Secret",
+			shouldFind: true,
 		},
 		{
-			name:        "Database URL",
-			content:     "DATABASE_URL=postgres://user:password@localhost:5432/mydb",
-			expectType:  "Database URL",
-			shouldFind:  true,
+			name:       "Database URL",
+			content:    "DATABASE_URL=postgres://user:password@localhost:5432/mydb",
+			expectType: "Database URL",
+			shouldFind: true,
 		},
 		{
-			name:        "Bearer Token",
-			content:     "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
-			expectType:  "Bearer Token",
-			shouldFind:  true,
+			name:       "Bearer Token",
+			content:    "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+			expectType: "Bearer Token",
+			shouldFind: true,
 		},
 		{
-			name:        "No secrets",
-			content:     "This is just plain text without any secrets",
-			expectType:  "",
-			shouldFind:  false,
+			name:       "No secrets",
+			content:    "This is just plain text without any secrets",
+			expectType: "",
+			shouldFind: false,
 		},
 		{
-			name:        "Mustache variable (not a secret)",
-			content:     "Hello {{name}}, your API key is {{api_key}}",
-			expectType:  "",
-			shouldFind:  false,
+			name:       "Mustache variable (not a secret)",
+			content:    "Hello {{name}}, your API key is {{api_key}}",
+			expectType: "",
+			shouldFind: false,
 		},
 	}
 

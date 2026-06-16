@@ -27,11 +27,11 @@ type Frontmatter struct {
 }
 
 type ParsedPrompt struct {
-	Frontmatter       *Frontmatter
-	Content           string
-	ExtractedVars     []string // Variables found in template ({{var}})
-	RawContent        string   // Original file content
-	HasFrontmatter    bool
+	Frontmatter    *Frontmatter
+	Content        string
+	ExtractedVars  []string // Variables found in template ({{var}})
+	RawContent     string   // Original file content
+	HasFrontmatter bool
 }
 
 func Parse(content string) (*ParsedPrompt, error) {

@@ -19,12 +19,12 @@ type TestSuite struct {
 
 // TestCase defines a single test with inputs and assertions
 type TestCase struct {
-	Name           string            `yaml:"name" json:"name"`
-	Inputs         map[string]any    `yaml:"inputs" json:"inputs"`
-	Assertions     []Assertion       `yaml:"assertions" json:"assertions"`
-	ExpectedOutput string            `yaml:"expected_output,omitempty" json:"expected_output,omitempty"`
-	Skip           bool              `yaml:"skip,omitempty" json:"skip,omitempty"`
-	Tags           []string          `yaml:"tags,omitempty" json:"tags,omitempty"`
+	Name           string         `yaml:"name" json:"name"`
+	Inputs         map[string]any `yaml:"inputs" json:"inputs"`
+	Assertions     []Assertion    `yaml:"assertions" json:"assertions"`
+	ExpectedOutput string         `yaml:"expected_output,omitempty" json:"expected_output,omitempty"`
+	Skip           bool           `yaml:"skip,omitempty" json:"skip,omitempty"`
+	Tags           []string       `yaml:"tags,omitempty" json:"tags,omitempty"`
 }
 
 // Assertion defines an expected condition on the output
@@ -39,35 +39,35 @@ type Assertion struct {
 type AssertionType string
 
 const (
-	AssertContains      AssertionType = "contains"
-	AssertNotContains   AssertionType = "not_contains"
-	AssertEquals        AssertionType = "equals"
-	AssertMatches       AssertionType = "matches"        // regex
-	AssertStartsWith    AssertionType = "starts_with"
-	AssertEndsWith      AssertionType = "ends_with"
-	AssertMinLength     AssertionType = "min_length"
-	AssertMaxLength     AssertionType = "max_length"
-	AssertJSONPath      AssertionType = "json_path"      // JSONPath query
-	AssertJSONValid     AssertionType = "json_valid"
-	AssertNotEmpty      AssertionType = "not_empty"
-	AssertLineCount     AssertionType = "line_count"     // exact line count
-	AssertMinLines      AssertionType = "min_lines"
-	AssertMaxLines      AssertionType = "max_lines"
-	AssertWordCount     AssertionType = "word_count"
-	AssertSnapshot      AssertionType = "snapshot"       // compare against stored expected_output
-	AssertSentiment     AssertionType = "sentiment"      // positive, negative, neutral
-	AssertLanguage      AssertionType = "language"       // e.g., "en", "es"
+	AssertContains    AssertionType = "contains"
+	AssertNotContains AssertionType = "not_contains"
+	AssertEquals      AssertionType = "equals"
+	AssertMatches     AssertionType = "matches" // regex
+	AssertStartsWith  AssertionType = "starts_with"
+	AssertEndsWith    AssertionType = "ends_with"
+	AssertMinLength   AssertionType = "min_length"
+	AssertMaxLength   AssertionType = "max_length"
+	AssertJSONPath    AssertionType = "json_path" // JSONPath query
+	AssertJSONValid   AssertionType = "json_valid"
+	AssertNotEmpty    AssertionType = "not_empty"
+	AssertLineCount   AssertionType = "line_count" // exact line count
+	AssertMinLines    AssertionType = "min_lines"
+	AssertMaxLines    AssertionType = "max_lines"
+	AssertWordCount   AssertionType = "word_count"
+	AssertSnapshot    AssertionType = "snapshot"  // compare against stored expected_output
+	AssertSentiment   AssertionType = "sentiment" // positive, negative, neutral
+	AssertLanguage    AssertionType = "language"  // e.g., "en", "es"
 )
 
 // TestResult holds the result of running a single test
 type TestResult struct {
-	TestName  string            `json:"test_name"`
-	Passed    bool              `json:"passed"`
-	Skipped   bool              `json:"skipped"`
-	Output    string            `json:"output,omitempty"`
-	Failures  []AssertionResult `json:"failures,omitempty"`
-	Error     string            `json:"error,omitempty"`
-	DurationMs int64            `json:"duration_ms"`
+	TestName   string            `json:"test_name"`
+	Passed     bool              `json:"passed"`
+	Skipped    bool              `json:"skipped"`
+	Output     string            `json:"output,omitempty"`
+	Failures   []AssertionResult `json:"failures,omitempty"`
+	Error      string            `json:"error,omitempty"`
+	DurationMs int64             `json:"duration_ms"`
 }
 
 // AssertionResult holds the result of a single assertion
