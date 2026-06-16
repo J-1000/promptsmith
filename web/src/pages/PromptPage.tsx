@@ -447,6 +447,16 @@ export function PromptPage() {
                     key={v.version}
                     className={`${styles.versionRow} ${selectedVersions.includes(v.version) ? styles.versionSelected : ''}`}
                     onClick={() => toggleVersion(v.version)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleVersion(v.version)
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedVersions.includes(v.version)}
+                    aria-label={`Select version ${v.version}: ${v.message}`}
                   >
                     <div className={styles.versionCheck}>
                       {selectedVersions.includes(v.version) && (

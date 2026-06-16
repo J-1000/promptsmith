@@ -259,12 +259,19 @@ export function HomePage() {
 
       {showNewModal && (
         <div className={styles.modalOverlay} onClick={() => setShowNewModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>New Prompt</h2>
+          <div
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-prompt-title"
+          >
+            <h2 id="new-prompt-title" className={styles.modalTitle}>New Prompt</h2>
             <form onSubmit={handleCreatePrompt} className={styles.modalForm}>
-              <label className={styles.label}>
+              <label className={styles.label} htmlFor="new-prompt-name">
                 Name
                 <input
+                  id="new-prompt-name"
                   type="text"
                   className={styles.input}
                   value={newName}
@@ -273,9 +280,10 @@ export function HomePage() {
                   autoFocus
                 />
               </label>
-              <label className={styles.label}>
+              <label className={styles.label} htmlFor="new-prompt-description">
                 Description
                 <input
+                  id="new-prompt-description"
                   type="text"
                   className={styles.input}
                   value={newDescription}
@@ -283,9 +291,10 @@ export function HomePage() {
                   placeholder="What does this prompt do?"
                 />
               </label>
-              <label className={styles.label}>
+              <label className={styles.label} htmlFor="new-prompt-content">
                 Content (optional)
                 <textarea
+                  id="new-prompt-content"
                   className={styles.textarea}
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}

@@ -50,11 +50,11 @@ export function SettingsPage() {
           ) : (
             <div className={styles.fieldGroup}>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>Name</label>
+                <span className={styles.fieldLabel}>Name</span>
                 <span className={styles.fieldValue}>{project?.name || '—'}</span>
               </div>
               <div className={styles.field}>
-                <label className={styles.fieldLabel}>ID</label>
+                <span className={styles.fieldLabel}>ID</span>
                 <code className={styles.fieldCode}>{project?.id || '—'}</code>
               </div>
             </div>
@@ -92,24 +92,24 @@ export function SettingsPage() {
               <div className={styles.fieldGroup}>
                 {syncConfig.team && (
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Team</label>
+                    <span className={styles.fieldLabel}>Team</span>
                     <span className={styles.fieldValue}>{syncConfig.team}</span>
                   </div>
                 )}
                 {syncConfig.remote && (
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Remote</label>
+                    <span className={styles.fieldLabel}>Remote</span>
                     <code className={styles.fieldCode}>{syncConfig.remote}</code>
                   </div>
                 )}
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Auto-push</label>
+                  <span className={styles.fieldLabel}>Auto-push</span>
                   <span className={styles.statusBadge} data-status={syncConfig.auto_push ? 'configured' : 'not_configured'}>
                     {syncConfig.auto_push ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
                 <div className={styles.field}>
-                  <label className={styles.fieldLabel}>Status</label>
+                  <span className={styles.fieldLabel}>Status</span>
                   <span className={styles.statusBadge} data-status="configured">Connected</span>
                 </div>
               </div>

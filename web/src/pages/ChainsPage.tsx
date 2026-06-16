@@ -129,11 +129,18 @@ export function ChainsPage() {
 
       {showCreate && (
         <div className={styles.modalOverlay} onClick={() => setShowCreate(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.modalTitle}>Create Chain</h2>
+          <div
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-chain-title"
+          >
+            <h2 id="create-chain-title" className={styles.modalTitle}>Create Chain</h2>
             <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Name</label>
+              <label className={styles.modalLabel} htmlFor="create-chain-name">Name</label>
               <input
+                id="create-chain-name"
                 className={styles.modalInput}
                 placeholder="e.g. summarize-translate"
                 value={newName}
@@ -142,8 +149,9 @@ export function ChainsPage() {
               />
             </div>
             <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Description</label>
+              <label className={styles.modalLabel} htmlFor="create-chain-description">Description</label>
               <input
+                id="create-chain-description"
                 className={styles.modalInput}
                 placeholder="What does this chain do?"
                 value={newDesc}

@@ -44,14 +44,16 @@ export function GeneratePanel({ onGenerate, results, isGenerating }: GeneratePan
     <div className={styles.container}>
       <div className={styles.controls}>
         <div className={styles.controlGroup}>
-          <label className={styles.label}>Type</label>
-          <div className={styles.typeButtons}>
+          <span id="generation-type-label" className={styles.label}>Type</span>
+          <div className={styles.typeButtons} role="group" aria-labelledby="generation-type-label">
             {(Object.keys(TYPE_DESCRIPTIONS) as GenerationType[]).map((t) => (
               <button
                 key={t}
+                type="button"
                 className={`${styles.typeButton} ${type === t ? styles.typeButtonActive : ''}`}
                 onClick={() => setType(t)}
                 title={TYPE_DESCRIPTIONS[t]}
+                aria-pressed={type === t}
               >
                 {t}
               </button>
@@ -61,8 +63,9 @@ export function GeneratePanel({ onGenerate, results, isGenerating }: GeneratePan
 
         <div className={styles.controlRow}>
           <div className={styles.controlGroup}>
-            <label className={styles.label}>Count</label>
+            <label className={styles.label} htmlFor="generation-count">Count</label>
             <select
+              id="generation-count"
               className={styles.select}
               value={count}
               onChange={(e) => setCount(parseInt(e.target.value))}
@@ -74,8 +77,9 @@ export function GeneratePanel({ onGenerate, results, isGenerating }: GeneratePan
           </div>
 
           <div className={styles.controlGroup} style={{ flex: 1 }}>
-            <label className={styles.label}>Goal (optional)</label>
+            <label className={styles.label} htmlFor="generation-goal">Goal (optional)</label>
             <input
+              id="generation-goal"
               type="text"
               className={styles.input}
               placeholder="e.g., be more concise, improve clarity"
@@ -86,6 +90,7 @@ export function GeneratePanel({ onGenerate, results, isGenerating }: GeneratePan
         </div>
 
         <button
+          type="button"
           className={styles.generateButton}
           onClick={handleGenerate}
           disabled={isGenerating}
@@ -112,6 +117,15 @@ export function GeneratePanel({ onGenerate, results, isGenerating }: GeneratePan
                 <div
                   className={styles.variationHeader}
                   onClick={() => setExpandedIdx(expandedIdx === idx ? null : idx)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setExpandedIdx(expandedIdx === idx ? null : idx)
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={expandedIdx === idx}
                 >
                   <span className={styles.variationNumber}>#{idx + 1}</span>
                   <span className={styles.variationDesc}>{v.description || 'Variation'}</span>

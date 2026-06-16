@@ -26,6 +26,10 @@ function extractVariables(content: string): string[] {
   return vars
 }
 
+function controlId(prefix: string, value: string): string {
+  return `${prefix}-${value.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+}
+
 export function PlaygroundPage() {
   // Source mode
   const [sourceMode, setSourceMode] = useState<'library' | 'adhoc'>('adhoc')
@@ -162,14 +166,18 @@ export function PlaygroundPage() {
             {/* Source toggle */}
             <div className={styles.sourceToggle}>
               <button
+                type="button"
                 className={`${styles.sourceToggleBtn} ${sourceMode === 'library' ? styles.sourceToggleBtnActive : ''}`}
                 onClick={() => setSourceMode('library')}
+                aria-pressed={sourceMode === 'library'}
               >
                 From Library
               </button>
               <button
+                type="button"
                 className={`${styles.sourceToggleBtn} ${sourceMode === 'adhoc' ? styles.sourceToggleBtnActive : ''}`}
                 onClick={() => setSourceMode('adhoc')}
+                aria-pressed={sourceMode === 'adhoc'}
               >
                 Ad-hoc
               </button>
@@ -179,8 +187,9 @@ export function PlaygroundPage() {
             {sourceMode === 'library' ? (
               <>
                 <div className={styles.field}>
-                  <label className={styles.label}>Prompt</label>
+                  <label className={styles.label} htmlFor="playground-prompt">Prompt</label>
                   <select
+                    id="playground-prompt"
                     className={styles.select}
                     value={selectedPrompt}
                     onChange={(e) => setSelectedPrompt(e.target.value)}
@@ -195,8 +204,9 @@ export function PlaygroundPage() {
                 </div>
                 {versions.length > 0 && (
                   <div className={styles.field}>
-                    <label className={styles.label}>Version</label>
+                    <label className={styles.label} htmlFor="playground-version">Version</label>
                     <select
+                      id="playground-version"
                       className={styles.select}
                       value={selectedVersion}
                       onChange={(e) => handleVersionChange(e.target.value)}
@@ -212,8 +222,9 @@ export function PlaygroundPage() {
               </>
             ) : (
               <div className={styles.field}>
-                <label className={styles.label}>Prompt Content</label>
+                <label className={styles.label} htmlFor="playground-content">Prompt Content</label>
                 <textarea
+                  id="playground-content"
                   className={styles.textarea}
                   value={adhocContent}
                   onChange={(e) => setAdhocContent(e.target.value)}
@@ -225,7 +236,7 @@ export function PlaygroundPage() {
 
             {/* Variables */}
             <div className={styles.field}>
-              <label className={styles.label}>Variables</label>
+              <span className={styles.label}>Variables</span>
               {detectedVars.length === 0 ? (
                 <span className={styles.noVarsHint}>
                   No variables detected. Use {'{{varName}}'} syntax.
@@ -234,8 +245,9 @@ export function PlaygroundPage() {
                 <div className={styles.variablesGrid}>
                   {detectedVars.map((v) => (
                     <div key={v} className={styles.variableRow}>
-                      <span className={styles.variableLabel}>{`{{${v}}}`}</span>
+                      <label className={styles.variableLabel} htmlFor={controlId('playground-var', v)}>{`{{${v}}}`}</label>
                       <input
+                        id={controlId('playground-var', v)}
                         className={styles.input}
                         type="text"
                         value={variables[v] || ''}
@@ -253,8 +265,9 @@ export function PlaygroundPage() {
             {/* Model + params */}
             <div className={styles.paramsRow}>
               <div className={styles.field}>
-                <label className={styles.label}>Model</label>
+                <label className={styles.label} htmlFor="playground-model">Model</label>
                 <select
+                  id="playground-model"
                   className={styles.select}
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
@@ -269,12 +282,13 @@ export function PlaygroundPage() {
               </div>
 
               <div className={styles.field}>
-                <div className={styles.sliderContainer}>
-                  <div className={styles.sliderHeader}>
-                    <label className={styles.label}>Temperature</label>
+                  <div className={styles.sliderContainer}>
+                    <div className={styles.sliderHeader}>
+                    <label className={styles.label} htmlFor="playground-temperature">Temperature</label>
                     <span className={styles.sliderValue}>{temperature.toFixed(1)}</span>
                   </div>
                   <input
+                    id="playground-temperature"
                     type="range"
                     className={styles.slider}
                     min="0"
@@ -287,8 +301,9 @@ export function PlaygroundPage() {
               </div>
 
               <div className={styles.field}>
-                <label className={styles.label}>Max Tokens</label>
+                <label className={styles.label} htmlFor="playground-max-tokens">Max Tokens</label>
                 <input
+                  id="playground-max-tokens"
                   className={styles.input}
                   type="number"
                   min={1}

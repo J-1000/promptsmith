@@ -276,6 +276,7 @@ export function ChainDetailPage() {
                         onClick={() => handleMoveStep(idx, -1)}
                         disabled={idx === 0}
                         title="Move up"
+                        aria-label={`Move step ${idx + 1} up`}
                       >
                         ↑
                       </button>
@@ -284,6 +285,7 @@ export function ChainDetailPage() {
                         onClick={() => handleMoveStep(idx, 1)}
                         disabled={idx === steps.length - 1}
                         title="Move down"
+                        aria-label={`Move step ${idx + 1} down`}
                       >
                         ↓
                       </button>
@@ -291,6 +293,7 @@ export function ChainDetailPage() {
                         className={styles.stepActionBtn}
                         onClick={() => handleRemoveStep(idx)}
                         title="Remove step"
+                        aria-label={`Remove step ${idx + 1}`}
                       >
                         ×
                       </button>
@@ -299,8 +302,9 @@ export function ChainDetailPage() {
 
                   <div className={styles.stepFields}>
                     <div className={styles.stepField}>
-                      <label className={styles.stepLabel}>Prompt</label>
+                      <label className={styles.stepLabel} htmlFor={`chain-step-${idx}-prompt`}>Prompt</label>
                       <select
+                        id={`chain-step-${idx}-prompt`}
                         className={styles.stepSelect}
                         value={step.prompt_name}
                         onChange={(e) =>
@@ -316,8 +320,9 @@ export function ChainDetailPage() {
                       </select>
                     </div>
                     <div className={styles.stepField}>
-                      <label className={styles.stepLabel}>Output Key</label>
+                      <label className={styles.stepLabel} htmlFor={`chain-step-${idx}-output`}>Output Key</label>
                       <input
+                        id={`chain-step-${idx}-output`}
                         className={styles.stepInput}
                         placeholder="e.g. summary"
                         value={step.output_key}
@@ -329,12 +334,13 @@ export function ChainDetailPage() {
                   </div>
 
                   <div className={styles.stepFieldFull}>
-                    <label className={styles.stepLabel}>Input Mapping</label>
+                    <span className={styles.stepLabel}>Input Mapping</span>
                     {step.mappings.map((m, mIdx) => (
                       <div key={mIdx} className={styles.mappingRow}>
                         <input
                           className={styles.mappingKey}
                           placeholder="variable"
+                          aria-label={`Step ${idx + 1} mapping ${mIdx + 1} variable`}
                           value={m.key}
                           onChange={(e) =>
                             updateMapping(idx, mIdx, 'key', e.target.value)
@@ -344,6 +350,7 @@ export function ChainDetailPage() {
                         <input
                           className={styles.mappingValue}
                           placeholder='{{input.var}} or {{steps.key.output}}'
+                          aria-label={`Step ${idx + 1} mapping ${mIdx + 1} source`}
                           value={m.value}
                           onChange={(e) =>
                             updateMapping(idx, mIdx, 'value', e.target.value)
@@ -352,6 +359,7 @@ export function ChainDetailPage() {
                         <button
                           className={styles.removeMappingBtn}
                           onClick={() => removeMapping(idx, mIdx)}
+                          aria-label={`Remove mapping ${mIdx + 1} from step ${idx + 1}`}
                         >
                           ×
                         </button>
@@ -391,8 +399,9 @@ export function ChainDetailPage() {
             <div className={styles.runInputs}>
               {requiredInputs.map((key) => (
                 <div key={key} className={styles.runInputRow}>
-                  <label className={styles.runInputLabel}>{key}</label>
+                  <label className={styles.runInputLabel} htmlFor={`chain-run-input-${key}`}>{key}</label>
                   <input
+                    id={`chain-run-input-${key}`}
                     className={styles.runInputField}
                     placeholder={`Enter ${key}...`}
                     value={runInputs[key] || ''}
@@ -410,6 +419,7 @@ export function ChainDetailPage() {
               className={styles.modelSelect}
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
+              aria-label="Model"
             >
               {models.length > 0 ? (
                 models.map((m) => (

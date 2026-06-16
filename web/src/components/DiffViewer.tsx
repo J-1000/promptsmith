@@ -70,7 +70,17 @@ export function DiffViewer({ oldVersion, newVersion, diff, comments = [], onAddC
                 <span
                   className={`${styles.lineNumber} ${onAddComment ? styles.lineNumberClickable : ''}`}
                   onClick={() => onAddComment && setCommentLine(commentLine === lineNum ? null : lineNum)}
+                  onKeyDown={(e) => {
+                    if (!onAddComment) return
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setCommentLine(commentLine === lineNum ? null : lineNum)
+                    }
+                  }}
+                  role={onAddComment ? 'button' : undefined}
+                  tabIndex={onAddComment ? 0 : undefined}
                   title={onAddComment ? 'Add comment' : undefined}
+                  aria-label={onAddComment ? `Add comment on line ${lineNum}` : undefined}
                 >
                   {lineNum}
                 </span>
@@ -94,6 +104,7 @@ export function DiffViewer({ oldVersion, newVersion, diff, comments = [], onAddC
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Add a comment..."
+                    aria-label={`Comment for line ${lineNum}`}
                     rows={2}
                     autoFocus
                   />

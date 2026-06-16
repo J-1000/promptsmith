@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import styles from './ConfirmDialog.module.css'
 
 export interface ConfirmDialogProps {
@@ -19,11 +20,21 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const titleId = useId()
+  const messageId = useId()
+
   return (
     <div className={styles.overlay} onClick={onCancel} data-testid="confirm-overlay">
-      <div className={styles.dialog} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
-        <h3 className={styles.title}>{title}</h3>
-        <p className={styles.message}>{message}</p>
+      <div
+        className={styles.dialog}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={messageId}
+      >
+        <h3 id={titleId} className={styles.title}>{title}</h3>
+        <p id={messageId} className={styles.message}>{message}</p>
         <div className={styles.actions}>
           <button className={styles.cancelButton} onClick={onCancel}>
             {cancelLabel}
