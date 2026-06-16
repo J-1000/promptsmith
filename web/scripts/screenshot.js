@@ -1,18 +1,19 @@
-import puppeteer from 'puppeteer';
+import { chromium } from '@playwright/test';
 
 async function takeScreenshot(url, outputPath) {
-  const browser = await puppeteer.launch({
+  const browser = await chromium.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
   });
 
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
+  const page = await browser.newPage({
+    viewport: { width: 1280, height: 800 }
+  });
 
-  await page.goto(url, { waitUntil: 'networkidle0' });
+  await page.goto(url, { waitUntil: 'networkidle' });
 
   // Wait a bit for fonts to load
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await page.waitForTimeout(1000);
 
   await page.screenshot({ path: outputPath, fullPage: false });
 
