@@ -12,6 +12,10 @@ var (
 	jsonOut bool
 )
 
+// version is the build version, overridden at release time via
+// -ldflags "-X github.com/promptsmith/cli/cmd.version=<tag>".
+var version = "dev"
+
 var rootCmd = &cobra.Command{
 	Use:   "promptsmith",
 	Short: "The GitHub Copilot for Prompt Engineering",
@@ -27,6 +31,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.Version = version
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&jsonOut, "json", false, "output as JSON")
 }
