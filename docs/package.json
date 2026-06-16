@@ -7,6 +7,11 @@
     "docs:preview": "vitepress preview"
   },
   "devDependencies": {
+    "esbuild": "^0.28.1",
     "vitepress": "^1.6.3"
+  },
+  "overrides": {
+    "@vitejs/plugin-vue": "6.0.7",
+    "vite": "8.0.16"
   }
 }

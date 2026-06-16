@@ -7,6 +7,9 @@ prd.md
 # Dependencies
 node_modules/
 
+# Build output
+docs/.vitepress/dist/
+
 # Environment
 .env
 .env.local
