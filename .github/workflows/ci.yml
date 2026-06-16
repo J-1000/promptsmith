@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
+          go-version: '1.25.11'
           cache-dependency-path: cli/go.sum
 
       - name: Install dependencies
@@ -30,6 +30,9 @@ jobs:
 
       - name: Test
         run: go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
