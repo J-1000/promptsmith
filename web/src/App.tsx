@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { Layout } from './components/Layout'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { PageLoader } from './components/PageLoader'
 
 const HomePage = lazy(() => import('./pages/HomePage').then((module) => ({ default: module.HomePage })))
 const PromptPage = lazy(() => import('./pages/PromptPage').then((module) => ({ default: module.PromptPage })))
@@ -16,22 +18,24 @@ const ChainDetailPage = lazy(() => import('./pages/ChainDetailPage').then((modul
 
 export default function App() {
   return (
-    <Suspense fallback={<div />}>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<HomePage />} />
-          <Route path="prompt/:name" element={<PromptPage />} />
-          <Route path="prompt/:name/edit" element={<EditorPage />} />
-          <Route path="tests" element={<TestsPage />} />
-          <Route path="tests/:name" element={<TestDetailPage />} />
-          <Route path="benchmarks" element={<BenchmarksPage />} />
-          <Route path="benchmarks/:name" element={<BenchmarkDetailPage />} />
-          <Route path="chains" element={<ChainsPage />} />
-          <Route path="chains/:name" element={<ChainDetailPage />} />
-          <Route path="playground" element={<PlaygroundPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
-      </Routes>
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<HomePage />} />
+            <Route path="prompt/:name" element={<PromptPage />} />
+            <Route path="prompt/:name/edit" element={<EditorPage />} />
+            <Route path="tests" element={<TestsPage />} />
+            <Route path="tests/:name" element={<TestDetailPage />} />
+            <Route path="benchmarks" element={<BenchmarksPage />} />
+            <Route path="benchmarks/:name" element={<BenchmarkDetailPage />} />
+            <Route path="chains" element={<ChainsPage />} />
+            <Route path="chains/:name" element={<ChainDetailPage />} />
+            <Route path="playground" element={<PlaygroundPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </ErrorBoundary>
   )
 }
