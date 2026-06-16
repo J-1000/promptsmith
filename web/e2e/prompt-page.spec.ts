@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { installApiMocks } from './api-mocks'
 
 test.describe('Prompt Page', () => {
   test.beforeEach(async ({ page }) => {
+    await installApiMocks(page)
     await page.goto('/prompt/greeting')
   })
 
@@ -55,6 +57,7 @@ test.describe('Prompt Page', () => {
 
   test('can switch to tests tab', async ({ page }) => {
     await page.click('button:has-text("Tests")')
+    await page.getByRole('button', { name: 'Run Tests' }).click()
 
     await expect(page.getByText('3 passed')).toBeVisible()
     await expect(page.getByText('1 failed')).toBeVisible()
@@ -62,25 +65,27 @@ test.describe('Prompt Page', () => {
 
   test('can expand failed test to see details', async ({ page }) => {
     await page.click('button:has-text("Tests")')
+    await page.getByRole('button', { name: 'Run Tests' }).click()
 
-    // Click on failed test row
-    await page.click('text=max-length-check')
+    await expect(page.getByText('max-length-check')).toBeVisible()
 
-    // Should show failure details
     await expect(page.getByText('expected at most 50 characters')).toBeVisible()
   })
 
   test('can switch to benchmarks tab', async ({ page }) => {
     await page.click('button:has-text("Benchmarks")')
+    await page.getByRole('button', { name: 'Run Benchmark' }).click()
 
     // Should show model comparison table
-    await expect(page.getByText('gpt-4o', { exact: true })).toBeVisible()
-    await expect(page.getByText('gpt-4o-mini', { exact: true })).toBeVisible()
-    await expect(page.getByText('claude-sonnet', { exact: true })).toBeVisible()
+    const table = page.getByRole('table')
+    await expect(table.getByText('gpt-4o', { exact: true })).toBeVisible()
+    await expect(table.getByText('gpt-4o-mini', { exact: true })).toBeVisible()
+    await expect(table.getByText('claude-sonnet', { exact: true })).toBeVisible()
   })
 
   test('shows benchmark recommendation', async ({ page }) => {
     await page.click('button:has-text("Benchmarks")')
+    await page.getByRole('button', { name: 'Run Benchmark' }).click()
 
     // gpt-4o-mini is fastest and cheapest in mock data
     await expect(page.getByText('gpt-4o-mini (best latency & cost)')).toBeVisible()

@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { installApiMocks } from './api-mocks'
 
 test.describe('Navigation', () => {
+  test.beforeEach(async ({ page }) => {
+    await installApiMocks(page)
+  })
+
   test('home page loads and shows prompts', async ({ page }) => {
     await page.goto('/')
 
@@ -12,10 +17,10 @@ test.describe('Navigation', () => {
   test('can navigate to prompt detail page', async ({ page }) => {
     await page.goto('/')
 
-    await page.click('text=greeting')
+    await page.locator('a[href="/prompt/greeting"]').click()
 
     await expect(page.getByRole('heading', { name: 'greeting' })).toBeVisible()
-    await expect(page.getByText('v1.0.2')).toBeVisible()
+    await expect(page.getByText('v1.0.2').first()).toBeVisible()
   })
 
   test('can navigate back to home from prompt page', async ({ page }) => {
