@@ -1,15 +1,14 @@
 # PromptSmith
 
-**The GitHub Copilot for Prompt Engineering**
+**Version control, tests, benchmarks, and a dashboard for LLM prompts.**
 
-PromptSmith brings software engineering best practices to prompt engineering. Version, test, iterate, and benchmark your LLM prompts with the same rigor you apply to code.
+PromptSmith brings software engineering best practices to prompt engineering. Version, test, iterate, and benchmark your LLM prompts with the same rigor you apply to code. The repository includes a Go CLI and API server, a React web dashboard, and VitePress documentation.
 
-## Recent Updates (2026-02-22)
+## Recent Updates (2026-06-16)
 
-- Prompt page run actions now execute the correct mapped test/benchmark suite names instead of assuming suite name equals prompt name.
-- Prompt listing API now fetches latest version in a single DB query (removed per-prompt lookup loop).
-- Chain listing API now fetches step counts in a single DB query (removed per-chain lookup loop).
-- Added regression tests for prompt latest-version listing and chain step-count listing behavior.
+- Benchmark cost estimates can be overridden with current vendor or account-specific rates via `PROMPTSMITH_MODEL_PRICING`.
+- Web UI API calls safely encode prompt, test, benchmark, and chain names in path segments.
+- Narrow-screen layouts and accessibility semantics have been tightened across the web dashboard.
 
 ## Features
 
@@ -32,15 +31,49 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 cd cli
 go build -o promptsmith .
 
+# Verify the binary
+./promptsmith --help
+
 # Add to PATH (optional)
 sudo mv promptsmith /usr/local/bin/
 ```
 
+## Local Development
+
+```bash
+# CLI
+cd cli
+go test ./...
+go build -o promptsmith .
+
+# Web dashboard
+cd ../web
+npm install
+npm run typecheck
+npm run test:run
+npm run build
+
+# Documentation site
+cd ../docs
+npm install
+npm run docs:build
+```
+
+Repository layout:
+
+| Path | Purpose |
+|------|---------|
+| `cli/` | Go CLI, local SQLite data layer, prompt parser, API server, tests, benchmarks, generation, and sync commands |
+| `web/` | React + TypeScript dashboard served by Vite |
+| `docs/` | VitePress documentation site |
+
 ## Quick Start
 
 ```bash
-# Initialize a project
-promptsmith init my-ai-app
+# Initialize a project in a new directory
+mkdir my-ai-app
+cd my-ai-app
+promptsmith init
 
 # Create a prompt file
 cat > prompts/summarizer.prompt << 'EOF'
