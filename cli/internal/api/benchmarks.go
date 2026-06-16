@@ -312,3 +312,12 @@ func (s *Server) listBenchmarkRuns(w http.ResponseWriter, r *http.Request, bench
 
 	writeJSON(w, http.StatusOK, response)
 }
+
+type BenchmarkSuiteResponse struct {
+	Name         string   `json:"name"`
+	FilePath     string   `json:"file_path"`
+	Prompt       string   `json:"prompt"`
+	Description  string   `json:"description,omitempty"`
+	Models       []string `json:"models"`
+	RunsPerModel int      `json:"runs_per_model"`
+}

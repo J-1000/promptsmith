@@ -74,3 +74,8 @@ func (s *Server) handleSyncConfig(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, cfg)
 }
+
+type ProjectResponse struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}

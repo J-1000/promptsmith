@@ -565,3 +565,21 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request, promptID str
 		},
 	})
 }
+
+type PromptResponse struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	FilePath    string `json:"file_path"`
+	Version     string `json:"version,omitempty"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type VersionResponse struct {
+	ID            string   `json:"id"`
+	Version       string   `json:"version"`
+	Content       string   `json:"content"`
+	CommitMessage string   `json:"commit_message"`
+	CreatedAt     string   `json:"created_at"`
+	Tags          []string `json:"tags,omitempty"`
+}

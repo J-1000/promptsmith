@@ -331,3 +331,11 @@ func (s *Server) getTestRun(w http.ResponseWriter, r *http.Request, testName str
 		CompletedAt: run.CompletedAt.Format("2006-01-02T15:04:05Z"),
 	})
 }
+
+type TestSuiteResponse struct {
+	Name        string `json:"name"`
+	FilePath    string `json:"file_path"`
+	Prompt      string `json:"prompt"`
+	Description string `json:"description,omitempty"`
+	TestCount   int    `json:"test_count"`
+}
