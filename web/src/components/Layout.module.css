@@ -8,6 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 16px 32px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-secondary);
@@ -40,6 +41,7 @@
 
 .nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 24px;
 }
 
@@ -73,4 +75,39 @@
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 14px 18px;
+  }
+
+  .nav {
+    gap: 8px;
+    width: 100%;
+  }
+
+  .navLink {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+  }
+
+  .main {
+    padding: 20px 16px 28px;
+  }
+}
+
+@media (max-width: 420px) {
+  .logoText {
+    font-size: 18px;
+  }
+
+  .main {
+    padding-inline: 12px;
+  }
 }

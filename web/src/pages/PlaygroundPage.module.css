@@ -8,6 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .title {
@@ -32,6 +33,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
   overflow: hidden;
+  min-width: 0;
 }
 
 .panelHeader {
@@ -203,7 +205,7 @@
 /* Model + params row */
 .paramsRow {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -301,6 +303,7 @@
 /* Stats bar */
 .statsBar {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   padding: 10px 16px;
   background: var(--bg-tertiary);
@@ -431,4 +434,56 @@
   font-size: 12px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .panels {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .panel {
+    min-height: 0;
+  }
+
+  .outputArea,
+  .emptyState,
+  .spinner {
+    min-height: 220px;
+  }
+}
+
+@media (max-width: 680px) {
+  .container {
+    gap: 20px;
+  }
+
+  .header,
+  .panelHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sourceToggle {
+    flex-direction: column;
+  }
+
+  .sourceToggleBtn,
+  .runButton,
+  .renderedToggle {
+    min-height: 44px;
+  }
+
+  .variableRow,
+  .paramsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .variableLabel {
+    text-align: left;
+  }
+
+  .statsBar {
+    gap: 10px 16px;
+  }
 }

@@ -7,6 +7,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 16px;
   background: var(--bg-tertiary);
   border-bottom: 1px solid var(--border-subtle);
@@ -14,6 +15,7 @@
 
 .summaryStats {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   font-family: var(--font-mono);
   font-size: 13px;
@@ -38,6 +40,7 @@
 .summaryMeta {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -152,6 +155,7 @@
 .testHeader {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
@@ -224,4 +228,43 @@
 
 .failureMessage {
   color: var(--error);
+}
+
+@media (max-width: 680px) {
+  .summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .summaryMeta,
+  .exportButton,
+  .rerunButton,
+  .runButton {
+    width: 100%;
+  }
+
+  .exportButton,
+  .rerunButton,
+  .runButton {
+    min-height: 44px;
+  }
+
+  .testName,
+  .failureMessage,
+  .errorMessage {
+    overflow-wrap: anywhere;
+  }
+
+  .failures {
+    margin-left: 0;
+  }
+
+  .failure {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .failureType {
+    min-width: 0;
+  }
 }

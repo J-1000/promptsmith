@@ -7,6 +7,7 @@
 .breadcrumb {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   font-size: 13px;
   color: var(--text-muted);
@@ -133,6 +134,7 @@
 
 .stepActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -386,6 +388,7 @@
 
 .runActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   align-items: center;
 }
@@ -542,4 +545,71 @@
   border: 1px dashed var(--border-default);
   border-radius: 8px;
   font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .container {
+    gap: 22px;
+  }
+
+  .headerRow,
+  .sectionHeader,
+  .runInputRow {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .deleteButton,
+  .addStepButton,
+  .saveButton,
+  .runButton,
+  .modelSelect {
+    min-height: 44px;
+  }
+
+  .stepCard,
+  .runPanel {
+    padding: 16px;
+  }
+
+  .stepHeader {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .stepFields {
+    grid-template-columns: 1fr;
+  }
+
+  .mappingRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mappingArrow {
+    transform: rotate(90deg);
+    align-self: flex-start;
+  }
+
+  .removeMappingBtn {
+    min-height: 36px;
+    align-self: flex-start;
+  }
+
+  .runInputLabel {
+    min-width: 0;
+  }
+
+  .runInputField,
+  .modelSelect,
+  .runButton,
+  .saveButton {
+    width: 100%;
+  }
+
+  .resultStepHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
 }

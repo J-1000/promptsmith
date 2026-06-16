@@ -57,6 +57,7 @@
   flex: 1;
   padding: 0 16px 0 8px;
   white-space: pre;
+  min-width: 0;
 }
 
 /* Hunk header */
@@ -210,4 +211,47 @@
   border-radius: 4px;
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+@media (max-width: 680px) {
+  .header {
+    padding: 10px 12px;
+  }
+
+  .diffContent {
+    font-size: 12px;
+  }
+
+  .lineNumber {
+    width: 40px;
+    padding-inline: 6px;
+  }
+
+  .linePrefix {
+    width: 20px;
+    padding-inline: 6px;
+  }
+
+  .lineContent {
+    padding-right: 10px;
+  }
+
+  .hunk .lineContent {
+    padding-left: 12px;
+  }
+
+  .commentBubble,
+  .commentInput {
+    margin-left: 12px;
+    margin-right: 12px;
+  }
+
+  .commentActions {
+    flex-direction: column-reverse;
+  }
+
+  .commentSubmit,
+  .commentCancel {
+    min-height: 44px;
+  }
 }

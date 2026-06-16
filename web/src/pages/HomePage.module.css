@@ -7,7 +7,7 @@
 /* Stats bar */
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
 
@@ -134,6 +134,7 @@
   color: var(--text-primary);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -237,7 +238,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
   gap: 16px;
 }
 
@@ -304,6 +305,7 @@
 
 .tags {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -535,4 +537,57 @@
 .submitButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+  .container {
+    gap: 24px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+  }
+
+  .headerActions,
+  .searchInput,
+  .newButton,
+  .refreshButton {
+    width: 100%;
+  }
+
+  .headerActions {
+    align-items: stretch;
+  }
+
+  .newButton,
+  .refreshButton,
+  .cancelButton,
+  .submitButton {
+    min-height: 44px;
+  }
+
+  .activityItem,
+  .cardFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .activityTime {
+    padding-left: 40px;
+  }
+
+  .modalOverlay {
+    align-items: flex-start;
+    padding: 24px 12px;
+    overflow-y: auto;
+  }
+
+  .modal {
+    width: 100%;
+    padding: 20px;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+  }
 }

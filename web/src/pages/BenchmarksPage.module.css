@@ -106,6 +106,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .benchName {
@@ -151,6 +152,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border-subtle);
 }
@@ -198,4 +200,30 @@
   padding: 2px 6px;
   background: var(--bg-tertiary);
   border-radius: 4px;
+}
+
+@media (max-width: 680px) {
+  .container {
+    gap: 24px;
+  }
+
+  .headerRow,
+  .cardHeader,
+  .cardFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .searchInput,
+  .refreshButton {
+    width: 100%;
+  }
+
+  .refreshButton {
+    min-height: 44px;
+  }
+
+  .filePath {
+    overflow-wrap: anywhere;
+  }
 }

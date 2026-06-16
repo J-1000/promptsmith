@@ -107,6 +107,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .chainName {
@@ -135,6 +136,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border-subtle);
 }
@@ -239,6 +241,45 @@
 .modalSubmit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 680px) {
+  .container {
+    gap: 24px;
+  }
+
+  .headerRow,
+  .cardHeader,
+  .cardFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .actions,
+  .searchInput,
+  .createButton {
+    width: 100%;
+  }
+
+  .createButton,
+  .modalCancel,
+  .modalSubmit {
+    min-height: 44px;
+  }
+
+  .modalOverlay {
+    align-items: flex-start;
+    padding: 24px 12px;
+    overflow-y: auto;
+  }
+
+  .modal {
+    padding: 20px;
+  }
+
+  .modalActions {
+    flex-direction: column-reverse;
+  }
 }
 
 /* States */
