@@ -971,7 +971,7 @@ func TestConfigPathWithSpaces(t *testing.T) {
 
 func TestConfigDeeplyNestedKey(t *testing.T) {
 	config := &Config{
-		Project: ProjectConfig{Name: "test"},
+		Project:  ProjectConfig{Name: "test"},
 		Defaults: DefaultsConfig{Model: "gpt-4o"},
 	}
 
@@ -1237,6 +1237,38 @@ func TestAddCommandFileNotFound(t *testing.T) {
 	err := runAdd(&cobra.Command{}, []string{"prompts/nonexistent.prompt"})
 	if err == nil {
 		t.Error("expected error when adding non-existent file")
+	}
+}
+
+func TestAddCommandRejectsFileOutsideProject(t *testing.T) {
+	tmpDir, cleanup := initTestProject(t)
+	defer cleanup()
+
+	outsidePath := filepath.Join(filepath.Dir(tmpDir), "outside.prompt")
+	if err := os.WriteFile(outsidePath, []byte("Hello from outside"), 0644); err != nil {
+		t.Fatalf("failed to write outside prompt: %v", err)
+	}
+
+	err := runAdd(&cobra.Command{}, []string{outsidePath})
+	if err == nil {
+		t.Fatal("expected error when adding a file outside the project")
+	}
+	if !strings.Contains(err.Error(), "inside the project") {
+		t.Fatalf("error = %q, want inside-project validation", err.Error())
+	}
+
+	database, err := db.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer database.Close()
+
+	prompt, err := database.GetPromptByName("outside")
+	if err != nil {
+		t.Fatalf("failed to get prompt: %v", err)
+	}
+	if prompt != nil {
+		t.Fatal("outside prompt should not be tracked")
 	}
 }
 

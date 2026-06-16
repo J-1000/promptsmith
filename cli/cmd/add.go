@@ -60,6 +60,9 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to make path relative: %w", err)
 	}
+	if _, err := safeProjectPath(projectRoot, relPath); err != nil {
+		return fmt.Errorf("prompt file must be inside the project: %w", err)
+	}
 
 	// Check if file exists
 	content, err := os.ReadFile(absPath)
