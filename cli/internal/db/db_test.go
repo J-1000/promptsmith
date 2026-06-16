@@ -54,6 +54,23 @@ func TestInitialize(t *testing.T) {
 	}
 }
 
+func TestOpenEnablesForeignKeys(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	var enabled int
+	if err := db.QueryRow("PRAGMA foreign_keys").Scan(&enabled); err != nil {
+		t.Fatalf("failed to read foreign_keys pragma: %v", err)
+	}
+	if enabled != 1 {
+		t.Fatalf("foreign_keys = %d, want 1", enabled)
+	}
+
+	if _, err := db.CreatePrompt("missing-project", "orphan", "", "prompts/orphan.prompt"); err == nil {
+		t.Fatal("expected missing project foreign key to fail")
+	}
+}
+
 func TestCreateAndGetProject(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -127,6 +144,22 @@ func TestCreateAndGetPrompt(t *testing.T) {
 	}
 	if notFound != nil {
 		t.Error("expected nil for non-existent prompt")
+	}
+}
+
+func TestPromptUniqueConstraints(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	if _, err := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt"); err != nil {
+		t.Fatalf("CreatePrompt failed: %v", err)
+	}
+	if _, err := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer-v2.prompt"); err == nil {
+		t.Fatal("expected duplicate prompt name to fail")
+	}
+	if _, err := db.CreatePrompt(project.ID, "summarizer-copy", "", "prompts/summarizer.prompt"); err == nil {
+		t.Fatal("expected duplicate prompt path to fail")
 	}
 }
 
@@ -243,6 +276,20 @@ func TestCreateAndGetVersions(t *testing.T) {
 	}
 }
 
+func TestVersionUniqueConstraint(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
+	if _, err := db.CreateVersion(prompt.ID, "1.0.0", "Content", "[]", "{}", "Initial", "testuser", nil); err != nil {
+		t.Fatalf("CreateVersion failed: %v", err)
+	}
+	if _, err := db.CreateVersion(prompt.ID, "1.0.0", "Content again", "[]", "{}", "Duplicate", "testuser", nil); err == nil {
+		t.Fatal("expected duplicate version to fail")
+	}
+}
+
 func TestTags(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -309,6 +356,20 @@ func TestTags(t *testing.T) {
 	}
 }
 
+func TestCreateTagRejectsWrongPromptVersion(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, _ := db.CreateProject("test-project")
+	promptA, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
+	promptB, _ := db.CreatePrompt(project.ID, "translator", "", "prompts/translator.prompt")
+	versionB, _ := db.CreateVersion(promptB.ID, "1.0.0", "Content", "[]", "{}", "Initial", "testuser", nil)
+
+	if _, err := db.CreateTag(promptA.ID, versionB.ID, "prod"); err == nil {
+		t.Fatal("expected tag for another prompt's version to fail")
+	}
+}
+
 func TestDeletePrompt(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
@@ -316,8 +377,26 @@ func TestDeletePrompt(t *testing.T) {
 	project, _ := db.CreateProject("test-project")
 	prompt, _ := db.CreatePrompt(project.ID, "to-delete", "Will be deleted", "prompts/delete.prompt")
 	v1, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content v1", "[]", "{}", "Initial", "user", nil)
-	db.CreateVersion(prompt.ID, "1.0.1", "Content v2", "[]", "{}", "Update", "user", &v1.ID)
+	v2, _ := db.CreateVersion(prompt.ID, "1.0.1", "Content v2", "[]", "{}", "Update", "user", &v1.ID)
 	db.CreateTag(prompt.ID, v1.ID, "prod")
+	db.CreateComment(prompt.ID, v2.ID, 1, "Needs revision")
+
+	if err := db.EnsureTestSuite("suite-delete", prompt.ID, "suite-delete", "{}"); err != nil {
+		t.Fatalf("EnsureTestSuite failed: %v", err)
+	}
+	if _, err := db.SaveTestRun("suite-delete", v2.ID, "passed", `{"passed":1}`); err != nil {
+		t.Fatalf("SaveTestRun failed: %v", err)
+	}
+	if err := db.EnsureBenchmark("bench-delete", prompt.ID, "{}"); err != nil {
+		t.Fatalf("EnsureBenchmark failed: %v", err)
+	}
+	if _, err := db.SaveBenchmarkRun("bench-delete", v2.ID, `{"models":[]}`); err != nil {
+		t.Fatalf("SaveBenchmarkRun failed: %v", err)
+	}
+	chain, _ := db.CreateChain(project.ID, "delete-chain", "")
+	if _, err := db.CreateChainStep(chain.ID, 1, prompt.Name, `{}`, "output"); err != nil {
+		t.Fatalf("CreateChainStep failed: %v", err)
+	}
 
 	// Delete prompt (should cascade)
 	err := db.DeletePrompt(prompt.ID)
@@ -350,6 +429,54 @@ func TestDeletePrompt(t *testing.T) {
 	}
 	if len(tags) != 0 {
 		t.Errorf("expected 0 tags, got %d", len(tags))
+	}
+
+	comments, err := db.ListComments(prompt.ID)
+	if err != nil {
+		t.Fatalf("ListComments failed: %v", err)
+	}
+	if len(comments) != 0 {
+		t.Errorf("expected 0 comments, got %d", len(comments))
+	}
+
+	testRuns, err := db.ListTestRuns("suite-delete")
+	if err != nil {
+		t.Fatalf("ListTestRuns failed: %v", err)
+	}
+	if len(testRuns) != 0 {
+		t.Errorf("expected 0 test runs, got %d", len(testRuns))
+	}
+
+	benchmarkRuns, err := db.ListBenchmarkRuns("bench-delete")
+	if err != nil {
+		t.Fatalf("ListBenchmarkRuns failed: %v", err)
+	}
+	if len(benchmarkRuns) != 0 {
+		t.Errorf("expected 0 benchmark runs, got %d", len(benchmarkRuns))
+	}
+
+	steps, err := db.ListChainSteps(chain.ID)
+	if err != nil {
+		t.Fatalf("ListChainSteps failed: %v", err)
+	}
+	if len(steps) != 0 {
+		t.Errorf("expected 0 chain steps, got %d", len(steps))
+	}
+
+	var suiteCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM test_suites WHERE prompt_id = ?", prompt.ID).Scan(&suiteCount); err != nil {
+		t.Fatalf("failed to count test suites: %v", err)
+	}
+	if suiteCount != 0 {
+		t.Errorf("expected 0 test suites, got %d", suiteCount)
+	}
+
+	var benchmarkCount int
+	if err := db.QueryRow("SELECT COUNT(*) FROM benchmarks WHERE prompt_id = ?", prompt.ID).Scan(&benchmarkCount); err != nil {
+		t.Fatalf("failed to count benchmarks: %v", err)
+	}
+	if benchmarkCount != 0 {
+		t.Errorf("expected 0 benchmarks, got %d", benchmarkCount)
 	}
 
 	// Delete non-existent prompt
@@ -411,6 +538,9 @@ func TestSaveAndListTestRuns(t *testing.T) {
 	project, _ := db.CreateProject("test-project")
 	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
 	v, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content", "[]", "{}", "Init", "user", nil)
+	if err := db.EnsureTestSuite("suite-1", prompt.ID, "suite-1", "{}"); err != nil {
+		t.Fatalf("EnsureTestSuite failed: %v", err)
+	}
 
 	// Save test run
 	run, err := db.SaveTestRun("suite-1", v.ID, "passed", `{"passed": 3, "failed": 0}`)
@@ -462,6 +592,9 @@ func TestSaveAndListBenchmarkRuns(t *testing.T) {
 	project, _ := db.CreateProject("test-project")
 	prompt, _ := db.CreatePrompt(project.ID, "summarizer", "", "prompts/summarizer.prompt")
 	v, _ := db.CreateVersion(prompt.ID, "1.0.0", "Content", "[]", "{}", "Init", "user", nil)
+	if err := db.EnsureBenchmark("bench-1", prompt.ID, "{}"); err != nil {
+		t.Fatalf("EnsureBenchmark failed: %v", err)
+	}
 
 	// Save benchmark run
 	run, err := db.SaveBenchmarkRun("bench-1", v.ID, `{"models": []}`)

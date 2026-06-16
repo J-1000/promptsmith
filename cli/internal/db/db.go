@@ -155,6 +155,13 @@ func Open(projectRoot string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+
+	if _, err := sqlDB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+		sqlDB.Close()
+		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
 
 	db := &DB{DB: sqlDB, projectRoot: projectRoot}
 	return db, nil
@@ -190,45 +197,49 @@ func (db *DB) createSchema() error {
 
 	CREATE TABLE IF NOT EXISTS prompts (
 		id TEXT PRIMARY KEY,
-		project_id TEXT REFERENCES projects(id),
+		project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 		name TEXT NOT NULL,
 		description TEXT,
 		file_path TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(project_id, name),
+		UNIQUE(project_id, file_path)
 	);
 
 	CREATE TABLE IF NOT EXISTS prompt_versions (
 		id TEXT PRIMARY KEY,
-		prompt_id TEXT REFERENCES prompts(id),
+		prompt_id TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
 		version TEXT NOT NULL,
 		content TEXT NOT NULL,
 		variables TEXT,
 		metadata TEXT,
-		parent_version_id TEXT,
+		parent_version_id TEXT REFERENCES prompt_versions(id) ON DELETE SET NULL,
 		commit_message TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		created_by TEXT
+		created_by TEXT,
+		UNIQUE(prompt_id, version)
 	);
 
 	CREATE TABLE IF NOT EXISTS tags (
 		id TEXT PRIMARY KEY,
-		prompt_id TEXT REFERENCES prompts(id),
-		version_id TEXT REFERENCES prompt_versions(id),
+		prompt_id TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+		version_id TEXT NOT NULL REFERENCES prompt_versions(id) ON DELETE CASCADE,
 		name TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(prompt_id, name)
 	);
 
 	CREATE TABLE IF NOT EXISTS test_suites (
 		id TEXT PRIMARY KEY,
-		prompt_id TEXT REFERENCES prompts(id),
+		prompt_id TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
 		name TEXT NOT NULL,
 		config TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS test_runs (
 		id TEXT PRIMARY KEY,
-		suite_id TEXT REFERENCES test_suites(id),
-		version_id TEXT REFERENCES prompt_versions(id),
+		suite_id TEXT NOT NULL REFERENCES test_suites(id) ON DELETE CASCADE,
+		version_id TEXT REFERENCES prompt_versions(id) ON DELETE SET NULL,
 		status TEXT,
 		results TEXT,
 		started_at DATETIME,
@@ -237,22 +248,22 @@ func (db *DB) createSchema() error {
 
 	CREATE TABLE IF NOT EXISTS benchmarks (
 		id TEXT PRIMARY KEY,
-		prompt_id TEXT REFERENCES prompts(id),
+		prompt_id TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
 		config TEXT NOT NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS benchmark_runs (
 		id TEXT PRIMARY KEY,
-		benchmark_id TEXT REFERENCES benchmarks(id),
-		version_id TEXT REFERENCES prompt_versions(id),
+		benchmark_id TEXT NOT NULL REFERENCES benchmarks(id) ON DELETE CASCADE,
+		version_id TEXT REFERENCES prompt_versions(id) ON DELETE SET NULL,
 		results TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS comments (
 		id TEXT PRIMARY KEY,
-		prompt_id TEXT REFERENCES prompts(id),
-		version_id TEXT REFERENCES prompt_versions(id),
+		prompt_id TEXT NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+		version_id TEXT NOT NULL REFERENCES prompt_versions(id) ON DELETE CASCADE,
 		line_number INTEGER NOT NULL,
 		content TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -262,14 +273,14 @@ func (db *DB) createSchema() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL UNIQUE,
 		description TEXT,
-		project_id TEXT REFERENCES projects(id),
+		project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE TABLE IF NOT EXISTS chain_steps (
 		id TEXT PRIMARY KEY,
-		chain_id TEXT REFERENCES chains(id),
+		chain_id TEXT NOT NULL REFERENCES chains(id) ON DELETE CASCADE,
 		step_order INTEGER NOT NULL,
 		prompt_name TEXT NOT NULL,
 		input_mapping TEXT,
@@ -278,7 +289,7 @@ func (db *DB) createSchema() error {
 
 	CREATE TABLE IF NOT EXISTS chain_runs (
 		id TEXT PRIMARY KEY,
-		chain_id TEXT REFERENCES chains(id),
+		chain_id TEXT NOT NULL REFERENCES chains(id) ON DELETE CASCADE,
 		status TEXT,
 		inputs TEXT,
 		results TEXT,
@@ -290,7 +301,15 @@ func (db *DB) createSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_prompts_project ON prompts(project_id);
 	CREATE INDEX IF NOT EXISTS idx_versions_prompt ON prompt_versions(prompt_id);
 	CREATE INDEX IF NOT EXISTS idx_tags_prompt ON tags(prompt_id);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_project_name_unique ON prompts(project_id, name);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_prompts_project_path_unique ON prompts(project_id, file_path);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_versions_prompt_version_unique ON prompt_versions(prompt_id, version);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_tags_prompt_name_unique ON tags(prompt_id, name);
 	CREATE INDEX IF NOT EXISTS idx_comments_prompt ON comments(prompt_id);
+	CREATE INDEX IF NOT EXISTS idx_test_suites_prompt ON test_suites(prompt_id);
+	CREATE INDEX IF NOT EXISTS idx_test_runs_suite ON test_runs(suite_id);
+	CREATE INDEX IF NOT EXISTS idx_benchmarks_prompt ON benchmarks(prompt_id);
+	CREATE INDEX IF NOT EXISTS idx_benchmark_runs_benchmark ON benchmark_runs(benchmark_id);
 	CREATE INDEX IF NOT EXISTS idx_chains_project ON chains(project_id);
 	CREATE INDEX IF NOT EXISTS idx_chain_steps_chain ON chain_steps(chain_id);
 	CREATE INDEX IF NOT EXISTS idx_chain_runs_chain ON chain_runs(chain_id);
@@ -557,6 +576,14 @@ func (db *DB) GetVersionByID(id string) (*PromptVersion, error) {
 }
 
 func (db *DB) CreateTag(promptID, versionID, name string) (*Tag, error) {
+	version, err := db.GetVersionByID(versionID)
+	if err != nil {
+		return nil, err
+	}
+	if version == nil || version.PromptID != promptID {
+		return nil, fmt.Errorf("version does not belong to prompt")
+	}
+
 	// Check if tag already exists
 	existing, err := db.GetTagByName(promptID, name)
 	if err != nil {
@@ -660,23 +687,47 @@ func (db *DB) UpdatePrompt(promptID, name, description string) (*Prompt, error) 
 }
 
 func (db *DB) DeletePrompt(promptID string) error {
+	var promptName string
+	var projectID string
+	err := db.QueryRow("SELECT name, project_id FROM prompts WHERE id = ?", promptID).Scan(&promptName, &projectID)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("prompt not found")
+	}
+	if err != nil {
+		return fmt.Errorf("failed to find prompt: %w", err)
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Delete tags first (references versions and prompts)
+	if _, err := tx.Exec("DELETE FROM comments WHERE prompt_id = ?", promptID); err != nil {
+		return fmt.Errorf("failed to delete comments: %w", err)
+	}
 	if _, err := tx.Exec("DELETE FROM tags WHERE prompt_id = ?", promptID); err != nil {
 		return fmt.Errorf("failed to delete tags: %w", err)
 	}
-
-	// Delete versions (references prompts)
+	if _, err := tx.Exec("DELETE FROM test_runs WHERE suite_id IN (SELECT id FROM test_suites WHERE prompt_id = ?)", promptID); err != nil {
+		return fmt.Errorf("failed to delete test runs: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM test_suites WHERE prompt_id = ?", promptID); err != nil {
+		return fmt.Errorf("failed to delete test suites: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM benchmark_runs WHERE benchmark_id IN (SELECT id FROM benchmarks WHERE prompt_id = ?)", promptID); err != nil {
+		return fmt.Errorf("failed to delete benchmark runs: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM benchmarks WHERE prompt_id = ?", promptID); err != nil {
+		return fmt.Errorf("failed to delete benchmarks: %w", err)
+	}
+	if _, err := tx.Exec("DELETE FROM chain_steps WHERE prompt_name = ? AND chain_id IN (SELECT id FROM chains WHERE project_id = ?)", promptName, projectID); err != nil {
+		return fmt.Errorf("failed to delete chain steps: %w", err)
+	}
 	if _, err := tx.Exec("DELETE FROM prompt_versions WHERE prompt_id = ?", promptID); err != nil {
 		return fmt.Errorf("failed to delete versions: %w", err)
 	}
 
-	// Delete the prompt itself
 	result, err := tx.Exec("DELETE FROM prompts WHERE id = ?", promptID)
 	if err != nil {
 		return fmt.Errorf("failed to delete prompt: %w", err)
@@ -773,6 +824,7 @@ func (db *DB) GetAllVersionsForLog() ([]struct {
 // Test Run methods
 
 func (db *DB) SaveTestRun(suiteID, versionID, status, results string) (*TestRun, error) {
+	versionValue := nullIfEmpty(versionID)
 	run := &TestRun{
 		ID:          NewUUID(),
 		SuiteID:     suiteID,
@@ -786,7 +838,7 @@ func (db *DB) SaveTestRun(suiteID, versionID, status, results string) (*TestRun,
 	_, err := db.Exec(
 		`INSERT INTO test_runs (id, suite_id, version_id, status, results, started_at, completed_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		run.ID, run.SuiteID, run.VersionID, run.Status, run.Results, run.StartedAt, run.CompletedAt,
+		run.ID, run.SuiteID, versionValue, run.Status, run.Results, run.StartedAt, run.CompletedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save test run: %w", err)
@@ -808,9 +860,11 @@ func (db *DB) ListTestRuns(suiteID string) ([]*TestRun, error) {
 	var runs []*TestRun
 	for rows.Next() {
 		var r TestRun
-		if err := rows.Scan(&r.ID, &r.SuiteID, &r.VersionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt); err != nil {
+		var versionID sql.NullString
+		if err := rows.Scan(&r.ID, &r.SuiteID, &versionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt); err != nil {
 			return nil, err
 		}
+		r.VersionID = stringFromNull(versionID)
 		runs = append(runs, &r)
 	}
 	return runs, nil
@@ -818,23 +872,27 @@ func (db *DB) ListTestRuns(suiteID string) ([]*TestRun, error) {
 
 func (db *DB) GetTestRun(runID string) (*TestRun, error) {
 	var r TestRun
-	err := db.QueryRow(
+	row := db.QueryRow(
 		`SELECT id, suite_id, version_id, status, results, started_at, completed_at
 		FROM test_runs WHERE id = ?`,
 		runID,
-	).Scan(&r.ID, &r.SuiteID, &r.VersionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt)
+	)
+	var versionID sql.NullString
+	err := row.Scan(&r.ID, &r.SuiteID, &versionID, &r.Status, &r.Results, &r.StartedAt, &r.CompletedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	r.VersionID = stringFromNull(versionID)
 	return &r, nil
 }
 
 // Benchmark Run methods
 
 func (db *DB) SaveBenchmarkRun(benchmarkID, versionID, results string) (*BenchmarkRun, error) {
+	versionValue := nullIfEmpty(versionID)
 	run := &BenchmarkRun{
 		ID:          NewUUID(),
 		BenchmarkID: benchmarkID,
@@ -846,7 +904,7 @@ func (db *DB) SaveBenchmarkRun(benchmarkID, versionID, results string) (*Benchma
 	_, err := db.Exec(
 		`INSERT INTO benchmark_runs (id, benchmark_id, version_id, results, created_at)
 		VALUES (?, ?, ?, ?, ?)`,
-		run.ID, run.BenchmarkID, run.VersionID, run.Results, run.CreatedAt,
+		run.ID, run.BenchmarkID, versionValue, run.Results, run.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save benchmark run: %w", err)
@@ -868,12 +926,28 @@ func (db *DB) ListBenchmarkRuns(benchmarkID string) ([]*BenchmarkRun, error) {
 	var runs []*BenchmarkRun
 	for rows.Next() {
 		var r BenchmarkRun
-		if err := rows.Scan(&r.ID, &r.BenchmarkID, &r.VersionID, &r.Results, &r.CreatedAt); err != nil {
+		var versionID sql.NullString
+		if err := rows.Scan(&r.ID, &r.BenchmarkID, &versionID, &r.Results, &r.CreatedAt); err != nil {
 			return nil, err
 		}
+		r.VersionID = stringFromNull(versionID)
 		runs = append(runs, &r)
 	}
 	return runs, nil
+}
+
+func nullIfEmpty(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func stringFromNull(value sql.NullString) string {
+	if value.Valid {
+		return value.String
+	}
+	return ""
 }
 
 // Comment methods

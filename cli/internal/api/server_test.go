@@ -61,6 +61,28 @@ func setupTestProject(t *testing.T) (string, *db.DB, func()) {
 	return tmpDir, database, cleanup
 }
 
+func ensureRunParents(t *testing.T, database *db.DB, suiteID, benchmarkID string) {
+	t.Helper()
+
+	prompt, err := database.GetPromptByName("summarizer")
+	if err != nil {
+		t.Fatalf("failed to get setup prompt: %v", err)
+	}
+	if prompt == nil {
+		t.Fatal("expected setup prompt to exist")
+	}
+	if suiteID != "" {
+		if err := database.EnsureTestSuite(suiteID, prompt.ID, suiteID, "{}"); err != nil {
+			t.Fatalf("failed to ensure test suite: %v", err)
+		}
+	}
+	if benchmarkID != "" {
+		if err := database.EnsureBenchmark(benchmarkID, prompt.ID, "{}"); err != nil {
+			t.Fatalf("failed to ensure benchmark: %v", err)
+		}
+	}
+}
+
 func TestServerRoutes(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
@@ -830,6 +852,7 @@ func TestGetTestRunRejectsMismatchedSuite(t *testing.T) {
 
 	server := NewServer(database, tmpDir)
 
+	ensureRunParents(t, database, "suite-a", "")
 	run, err := database.SaveTestRun("suite-a", "", "passed", `{"ok":true}`)
 	if err != nil {
 		t.Fatalf("failed to save run: %v", err)
@@ -1393,8 +1416,13 @@ func TestListBenchmarkRuns(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
 
-	database.SaveBenchmarkRun("my-bench", "", `{"models":[]}`)
-	database.SaveBenchmarkRun("my-bench", "", `{"models":[{"model":"gpt-4o"}]}`)
+	ensureRunParents(t, database, "", "my-bench")
+	if _, err := database.SaveBenchmarkRun("my-bench", "", `{"models":[]}`); err != nil {
+		t.Fatalf("failed to save benchmark run: %v", err)
+	}
+	if _, err := database.SaveBenchmarkRun("my-bench", "", `{"models":[{"model":"gpt-4o"}]}`); err != nil {
+		t.Fatalf("failed to save benchmark run: %v", err)
+	}
 
 	server := NewServer(database, tmpDir)
 
@@ -1421,9 +1449,14 @@ func TestListTestRuns(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
 
+	ensureRunParents(t, database, "my-suite", "")
 	// Save some test runs
-	database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`)
-	database.SaveTestRun("my-suite", "", "failed", `{"failed":1}`)
+	if _, err := database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`); err != nil {
+		t.Fatalf("failed to save test run: %v", err)
+	}
+	if _, err := database.SaveTestRun("my-suite", "", "failed", `{"failed":1}`); err != nil {
+		t.Fatalf("failed to save test run: %v", err)
+	}
 
 	server := NewServer(database, tmpDir)
 
@@ -1450,7 +1483,11 @@ func TestGetTestRun(t *testing.T) {
 	tmpDir, database, cleanup := setupTestProject(t)
 	defer cleanup()
 
-	run, _ := database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`)
+	ensureRunParents(t, database, "my-suite", "")
+	run, err := database.SaveTestRun("my-suite", "", "passed", `{"passed":2}`)
+	if err != nil {
+		t.Fatalf("failed to save test run: %v", err)
+	}
 
 	server := NewServer(database, tmpDir)
 
