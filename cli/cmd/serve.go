@@ -20,13 +20,13 @@ This allows the web UI to connect to your local project and display
 real data instead of mock data.
 
 Examples:
-  promptsmith serve              # Start on default port 3001
-  promptsmith serve --port 8080  # Start on custom port`,
+  promptsmith serve              # Start on default port 8080
+  promptsmith serve --port 3000  # Start on custom port`,
 	RunE: runServe,
 }
 
 func init() {
-	serveCmd.Flags().IntVarP(&servePort, "port", "p", 3001, "port to listen on")
+	serveCmd.Flags().IntVarP(&servePort, "port", "p", 8080, "port to listen on")
 	rootCmd.AddCommand(serveCmd)
 }
 
