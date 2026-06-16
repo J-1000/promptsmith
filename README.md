@@ -26,13 +26,23 @@ PromptSmith brings software engineering best practices to prompt engineering. Ve
 
 ## Installation
 
+Download a prebuilt binary for your platform from the
+[latest release](https://github.com/promptsmith/promptsmith/releases/latest):
+
 ```bash
-# Build from source
+tar -xzf promptsmith_<version>_<os>_<arch>.tar.gz
+sudo mv promptsmith /usr/local/bin/
+promptsmith --version
+```
+
+Or build from source (requires a C toolchain for the SQLite driver):
+
+```bash
 cd cli
 go build -o promptsmith .
 
 # Verify the binary
-./promptsmith --help
+./promptsmith --version
 
 # Add to PATH (optional)
 sudo mv promptsmith /usr/local/bin/

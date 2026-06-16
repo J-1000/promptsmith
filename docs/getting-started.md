@@ -2,16 +2,27 @@
 
 ## Installation
 
+Download a prebuilt binary for your platform from the
+[latest release](https://github.com/promptsmith/promptsmith/releases/latest),
+extract it, and place `promptsmith` on your `PATH`:
+
 ```bash
-go install github.com/promptsmith/cli@latest
+tar -xzf promptsmith_<version>_<os>_<arch>.tar.gz
+sudo mv promptsmith /usr/local/bin/
 ```
 
-Or build from source:
+Or build from source (requires a C toolchain for the SQLite driver):
 
 ```bash
 git clone https://github.com/promptsmith/promptsmith.git
 cd promptsmith/cli
 go build -o promptsmith .
+```
+
+Verify the install:
+
+```bash
+promptsmith --version
 ```
 
 ## Initialize a Project
