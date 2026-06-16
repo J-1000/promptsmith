@@ -5,13 +5,30 @@ import {
   getPrompt,
   getPromptVersions,
   getPromptDiff,
+  createVersion,
+  updatePrompt,
+  deletePrompt,
+  createTag,
+  deleteTag,
   listTests,
   getTest,
   runTest,
+  listTestRuns,
+  getTestRun,
   listBenchmarks,
   getBenchmark,
   runBenchmark,
+  listBenchmarkRuns,
   generateVariations,
+  listComments,
+  createComment,
+  deleteComment,
+  getChain,
+  updateChain,
+  deleteChain,
+  saveChainSteps,
+  runChain,
+  listChainRuns,
 } from './api'
 
 // Mock fetch globally
@@ -32,6 +49,15 @@ function mockErrorResponse(error: string, status = 400) {
     status,
     json: () => Promise.resolve({ error }),
   }
+}
+
+async function expectRequestUrl(action: () => Promise<unknown>, url: string) {
+  mockFetch.mockReset()
+  mockFetch.mockResolvedValue(mockResponse({}))
+
+  await action()
+
+  expect(mockFetch).toHaveBeenCalledWith(url, expect.any(Object))
 }
 
 describe('API Client', () => {
@@ -125,6 +151,118 @@ describe('API Client', () => {
         expect.any(Object)
       )
       expect(result).toEqual(diff)
+    })
+  })
+
+  describe('Path encoding', () => {
+    it('encodes dynamic prompt route segments and diff query values', async () => {
+      const promptName = 'team/greeting #1'
+
+      await expectRequestUrl(
+        () => getPrompt(promptName),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231'
+      )
+      await expectRequestUrl(
+        () => getPromptVersions(promptName),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/versions'
+      )
+      await expectRequestUrl(
+        () => getPromptDiff(promptName, '1.0/alpha', '1.1 beta'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/diff?v1=1.0%2Falpha&v2=1.1+beta'
+      )
+      await expectRequestUrl(
+        () => createVersion(promptName, 'Hello', 'Initial'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/versions'
+      )
+      await expectRequestUrl(
+        () => updatePrompt(promptName, 'new name', 'description'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231'
+      )
+      await expectRequestUrl(
+        () => deletePrompt(promptName),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231'
+      )
+      await expectRequestUrl(
+        () => createTag(promptName, 'prod/canary #1', 'version-1'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/tags'
+      )
+      await expectRequestUrl(
+        () => deleteTag(promptName, 'prod/canary #1'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/tags/prod%2Fcanary%20%231'
+      )
+    })
+
+    it('encodes dynamic test and benchmark route segments', async () => {
+      await expectRequestUrl(
+        () => getTest('eval/suite #1'),
+        'http://localhost:8080/api/tests/eval%2Fsuite%20%231'
+      )
+      await expectRequestUrl(
+        () => runTest('eval/suite #1'),
+        'http://localhost:8080/api/tests/eval%2Fsuite%20%231/run'
+      )
+      await expectRequestUrl(
+        () => listTestRuns('eval/suite #1'),
+        'http://localhost:8080/api/tests/eval%2Fsuite%20%231/runs'
+      )
+      await expectRequestUrl(
+        () => getTestRun('eval/suite #1', 'run/1 #2'),
+        'http://localhost:8080/api/tests/eval%2Fsuite%20%231/runs/run%2F1%20%232'
+      )
+      await expectRequestUrl(
+        () => getBenchmark('bench/suite #1'),
+        'http://localhost:8080/api/benchmarks/bench%2Fsuite%20%231'
+      )
+      await expectRequestUrl(
+        () => runBenchmark('bench/suite #1'),
+        'http://localhost:8080/api/benchmarks/bench%2Fsuite%20%231/run'
+      )
+      await expectRequestUrl(
+        () => listBenchmarkRuns('bench/suite #1'),
+        'http://localhost:8080/api/benchmarks/bench%2Fsuite%20%231/runs'
+      )
+    })
+
+    it('encodes dynamic comment and chain route segments', async () => {
+      const promptName = 'team/greeting #1'
+      const chainName = 'research/chain #1'
+
+      await expectRequestUrl(
+        () => listComments(promptName),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/comments'
+      )
+      await expectRequestUrl(
+        () => createComment(promptName, 'version-1', 7, 'Looks good'),
+        'http://localhost:8080/api/prompts/team%2Fgreeting%20%231/comments'
+      )
+      await expectRequestUrl(
+        () => deleteComment('comment/1 #2'),
+        'http://localhost:8080/api/comments/comment%2F1%20%232'
+      )
+      await expectRequestUrl(
+        () => getChain(chainName),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231'
+      )
+      await expectRequestUrl(
+        () => updateChain(chainName, 'new name', 'description'),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231'
+      )
+      await expectRequestUrl(
+        () => deleteChain(chainName),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231'
+      )
+      await expectRequestUrl(
+        () => saveChainSteps(chainName, []),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231/steps'
+      )
+      await expectRequestUrl(
+        () => runChain(chainName, {}, 'gpt-4o-mini'),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231/run'
+      )
+      await expectRequestUrl(
+        () => listChainRuns(chainName),
+        'http://localhost:8080/api/chains/research%2Fchain%20%231/runs'
+      )
     })
   })
 

@@ -2,6 +2,10 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+function pathSegment(value: string): string {
+  return encodeURIComponent(value);
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -129,11 +133,11 @@ export async function listPrompts(): Promise<Prompt[]> {
 }
 
 export async function getPrompt(name: string): Promise<Prompt> {
-  return fetchApi<Prompt>(`/api/prompts/${name}`);
+  return fetchApi<Prompt>(`/api/prompts/${pathSegment(name)}`);
 }
 
 export async function getPromptVersions(name: string): Promise<Version[]> {
-  return fetchApi<Version[]>(`/api/prompts/${name}/versions`);
+  return fetchApi<Version[]>(`/api/prompts/${pathSegment(name)}/versions`);
 }
 
 export async function getPromptDiff(
@@ -141,7 +145,8 @@ export async function getPromptDiff(
   v1: string,
   v2: string
 ): Promise<{ prompt: string; v1: { version: string; content: string }; v2: { version: string; content: string } }> {
-  return fetchApi(`/api/prompts/${name}/diff?v1=${v1}&v2=${v2}`);
+  const query = new URLSearchParams({ v1, v2 });
+  return fetchApi(`/api/prompts/${pathSegment(name)}/diff?${query}`);
 }
 
 export async function createVersion(
@@ -149,7 +154,7 @@ export async function createVersion(
   content: string,
   commitMessage: string
 ): Promise<Version> {
-  return fetchApi<Version>(`/api/prompts/${name}/versions`, {
+  return fetchApi<Version>(`/api/prompts/${pathSegment(name)}/versions`, {
     method: 'POST',
     body: JSON.stringify({ content, commit_message: commitMessage }),
   });
@@ -171,14 +176,14 @@ export async function updatePrompt(
   newName: string,
   description: string
 ): Promise<Prompt> {
-  return fetchApi<Prompt>(`/api/prompts/${name}`, {
+  return fetchApi<Prompt>(`/api/prompts/${pathSegment(name)}`, {
     method: 'PUT',
     body: JSON.stringify({ name: newName, description }),
   });
 }
 
 export async function deletePrompt(name: string): Promise<void> {
-  await fetch(`${API_BASE}/api/prompts/${name}`, {
+  await fetch(`${API_BASE}/api/prompts/${pathSegment(name)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   }).then((res) => {
@@ -191,14 +196,14 @@ export async function createTag(
   tagName: string,
   versionId: string
 ): Promise<{ id: string; name: string; version_id: string }> {
-  return fetchApi(`/api/prompts/${promptName}/tags`, {
+  return fetchApi(`/api/prompts/${pathSegment(promptName)}/tags`, {
     method: 'POST',
     body: JSON.stringify({ name: tagName, version_id: versionId }),
   });
 }
 
 export async function deleteTag(promptName: string, tagName: string): Promise<void> {
-  await fetch(`${API_BASE}/api/prompts/${promptName}/tags/${tagName}`, {
+  await fetch(`${API_BASE}/api/prompts/${pathSegment(promptName)}/tags/${pathSegment(tagName)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   }).then((res) => {
@@ -223,11 +228,11 @@ export async function createTestSuite(
 }
 
 export async function getTest(name: string): Promise<TestSuite> {
-  return fetchApi<TestSuite>(`/api/tests/${name}`);
+  return fetchApi<TestSuite>(`/api/tests/${pathSegment(name)}`);
 }
 
 export async function runTest(name: string): Promise<SuiteResult> {
-  return fetchApi<SuiteResult>(`/api/tests/${name}/run`, { method: 'POST' });
+  return fetchApi<SuiteResult>(`/api/tests/${pathSegment(name)}/run`, { method: 'POST' });
 }
 
 export interface TestRunEntry {
@@ -240,11 +245,11 @@ export interface TestRunEntry {
 }
 
 export async function listTestRuns(name: string): Promise<TestRunEntry[]> {
-  return fetchApi<TestRunEntry[]>(`/api/tests/${name}/runs`);
+  return fetchApi<TestRunEntry[]>(`/api/tests/${pathSegment(name)}/runs`);
 }
 
 export async function getTestRun(name: string, runId: string): Promise<TestRunEntry> {
-  return fetchApi<TestRunEntry>(`/api/tests/${name}/runs/${runId}`);
+  return fetchApi<TestRunEntry>(`/api/tests/${pathSegment(name)}/runs/${pathSegment(runId)}`);
 }
 
 // Benchmarks
@@ -266,11 +271,11 @@ export async function createBenchmarkSuite(
 }
 
 export async function getBenchmark(name: string): Promise<BenchmarkSuite> {
-  return fetchApi<BenchmarkSuite>(`/api/benchmarks/${name}`);
+  return fetchApi<BenchmarkSuite>(`/api/benchmarks/${pathSegment(name)}`);
 }
 
 export async function runBenchmark(name: string): Promise<BenchmarkResult> {
-  return fetchApi<BenchmarkResult>(`/api/benchmarks/${name}/run`, { method: 'POST' });
+  return fetchApi<BenchmarkResult>(`/api/benchmarks/${pathSegment(name)}/run`, { method: 'POST' });
 }
 
 export interface BenchmarkRunEntry {
@@ -281,7 +286,7 @@ export interface BenchmarkRunEntry {
 }
 
 export async function listBenchmarkRuns(name: string): Promise<BenchmarkRunEntry[]> {
-  return fetchApi<BenchmarkRunEntry[]>(`/api/benchmarks/${name}/runs`);
+  return fetchApi<BenchmarkRunEntry[]>(`/api/benchmarks/${pathSegment(name)}/runs`);
 }
 
 // Generate
@@ -333,7 +338,7 @@ export interface Comment {
 }
 
 export async function listComments(promptName: string): Promise<Comment[]> {
-  return fetchApi<Comment[]>(`/api/prompts/${promptName}/comments`);
+  return fetchApi<Comment[]>(`/api/prompts/${pathSegment(promptName)}/comments`);
 }
 
 export async function createComment(
@@ -342,14 +347,14 @@ export async function createComment(
   lineNumber: number,
   content: string
 ): Promise<Comment> {
-  return fetchApi<Comment>(`/api/prompts/${promptName}/comments`, {
+  return fetchApi<Comment>(`/api/prompts/${pathSegment(promptName)}/comments`, {
     method: 'POST',
     body: JSON.stringify({ version_id: versionId, line_number: lineNumber, content }),
   });
 }
 
 export async function deleteComment(commentId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/comments/${commentId}`, {
+  await fetch(`${API_BASE}/api/comments/${pathSegment(commentId)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   }).then((res) => {
@@ -489,7 +494,7 @@ export async function listChains(): Promise<Chain[]> {
 }
 
 export async function getChain(name: string): Promise<ChainDetail> {
-  return fetchApi<ChainDetail>(`/api/chains/${name}`);
+  return fetchApi<ChainDetail>(`/api/chains/${pathSegment(name)}`);
 }
 
 export async function createChain(name: string, description: string): Promise<Chain> {
@@ -500,14 +505,14 @@ export async function createChain(name: string, description: string): Promise<Ch
 }
 
 export async function updateChain(name: string, newName: string, description: string): Promise<Chain> {
-  return fetchApi<Chain>(`/api/chains/${name}`, {
+  return fetchApi<Chain>(`/api/chains/${pathSegment(name)}`, {
     method: 'PUT',
     body: JSON.stringify({ name: newName, description }),
   });
 }
 
 export async function deleteChain(name: string): Promise<void> {
-  await fetch(`${API_BASE}/api/chains/${name}`, {
+  await fetch(`${API_BASE}/api/chains/${pathSegment(name)}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
   }).then((res) => {
@@ -516,7 +521,7 @@ export async function deleteChain(name: string): Promise<void> {
 }
 
 export async function saveChainSteps(name: string, steps: ChainStepInput[]): Promise<ChainStep[]> {
-  return fetchApi<ChainStep[]>(`/api/chains/${name}/steps`, {
+  return fetchApi<ChainStep[]>(`/api/chains/${pathSegment(name)}/steps`, {
     method: 'PUT',
     body: JSON.stringify({ steps }),
   });
@@ -527,12 +532,12 @@ export async function runChain(
   inputs: Record<string, string>,
   model: string
 ): Promise<ChainRunResult> {
-  return fetchApi<ChainRunResult>(`/api/chains/${name}/run`, {
+  return fetchApi<ChainRunResult>(`/api/chains/${pathSegment(name)}/run`, {
     method: 'POST',
     body: JSON.stringify({ inputs, model }),
   });
 }
 
 export async function listChainRuns(name: string): Promise<ChainRunResult[]> {
-  return fetchApi<ChainRunResult[]>(`/api/chains/${name}/runs`);
+  return fetchApi<ChainRunResult[]>(`/api/chains/${pathSegment(name)}/runs`);
 }
