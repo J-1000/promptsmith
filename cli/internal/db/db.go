@@ -176,6 +176,10 @@ func Open(projectRoot string) (*DB, error) {
 	}
 
 	db := &DB{DB: sqlDB, projectRoot: projectRoot}
+	if err := db.migrate(); err != nil {
+		sqlDB.Close()
+		return nil, err
+	}
 	return db, nil
 }
 
@@ -185,21 +189,49 @@ func Initialize(projectRoot string) (*DB, error) {
 		return nil, fmt.Errorf("failed to create config directory: %w", err)
 	}
 
-	db, err := Open(projectRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := db.createSchema(); err != nil {
-		db.Close()
-		return nil, err
-	}
-
-	return db, nil
+	// Open runs migrations, which create the schema on a fresh database.
+	return Open(projectRoot)
 }
 
-func (db *DB) createSchema() error {
-	schema := `
+// migrations is the ordered list of schema migrations. Each entry advances the
+// database by one version; the applied version is tracked in SQLite's
+// PRAGMA user_version. Append new migrations to the end — never edit or reorder
+// existing entries, as that would corrupt already-migrated databases.
+var migrations = []string{
+	schemaV1,
+}
+
+// migrate applies any migrations newer than the database's current
+// user_version, each within its own transaction.
+func (db *DB) migrate() error {
+	var current int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&current); err != nil {
+		return fmt.Errorf("failed to read schema version: %w", err)
+	}
+
+	for v := current; v < len(migrations); v++ {
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("failed to begin migration %d: %w", v+1, err)
+		}
+		if _, err := tx.Exec(migrations[v]); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to apply migration %d: %w", v+1, err)
+		}
+		// user_version is a pragma and cannot be parameterized; v+1 is a
+		// trusted loop counter, so the formatting is safe.
+		if _, err := tx.Exec(fmt.Sprintf("PRAGMA user_version = %d", v+1)); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to record migration %d: %w", v+1, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit migration %d: %w", v+1, err)
+		}
+	}
+	return nil
+}
+
+const schemaV1 = `
 	CREATE TABLE IF NOT EXISTS projects (
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
@@ -326,13 +358,6 @@ func (db *DB) createSchema() error {
 	CREATE INDEX IF NOT EXISTS idx_chain_steps_chain ON chain_steps(chain_id);
 	CREATE INDEX IF NOT EXISTS idx_chain_runs_chain ON chain_runs(chain_id);
 	`
-
-	_, err := db.Exec(schema)
-	if err != nil {
-		return fmt.Errorf("failed to create schema: %w", err)
-	}
-	return nil
-}
 
 func (db *DB) ProjectRoot() string {
 	return db.projectRoot

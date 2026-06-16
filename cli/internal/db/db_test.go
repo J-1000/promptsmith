@@ -73,6 +73,52 @@ func TestOpenEnablesForeignKeys(t *testing.T) {
 	}
 }
 
+func TestMigrationsSetUserVersion(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	var version int
+	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
+		t.Fatalf("failed to read user_version: %v", err)
+	}
+	if version != len(migrations) {
+		t.Fatalf("user_version = %d, want %d", version, len(migrations))
+	}
+}
+
+func TestReopenIsIdempotent(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "promptsmith-test-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Initialize(tmpDir)
+	if err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+	if _, err := db.CreateProject("first"); err != nil {
+		t.Fatalf("CreateProject failed: %v", err)
+	}
+	db.Close()
+
+	// Reopening an existing database must re-run migrations without error and
+	// preserve existing data.
+	reopened, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("reopen failed: %v", err)
+	}
+	defer reopened.Close()
+
+	project, err := reopened.GetProject()
+	if err != nil {
+		t.Fatalf("GetProject failed: %v", err)
+	}
+	if project == nil || project.Name != "first" {
+		t.Fatalf("expected preserved project, got %+v", project)
+	}
+}
+
 func TestOpenEnablesWAL(t *testing.T) {
 	db, _, cleanup := setupTestDB(t)
 	defer cleanup()
