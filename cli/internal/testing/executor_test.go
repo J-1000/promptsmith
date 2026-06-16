@@ -3,6 +3,7 @@ package testing
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/promptsmith/cli/internal/benchmark"
 )
@@ -12,12 +13,17 @@ type mockProvider struct {
 	name     string
 	response *benchmark.CompletionResponse
 	err      error
+	block    bool // when true, Complete blocks until the context is cancelled
 }
 
 func (m *mockProvider) Name() string { return m.name }
 func (m *mockProvider) Models() []string { return []string{"gpt-4o-mini"} }
 func (m *mockProvider) SupportsModel(model string) bool { return true }
 func (m *mockProvider) Complete(ctx context.Context, req benchmark.CompletionRequest) (*benchmark.CompletionResponse, error) {
+	if m.block {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -66,6 +72,36 @@ func TestLLMExecutor_Options(t *testing.T) {
 	}
 	if executor.temperature != 0.5 {
 		t.Errorf("Expected temperature 0.5, got %f", executor.temperature)
+	}
+}
+
+func TestLLMExecutor_Timeout(t *testing.T) {
+	registry := benchmark.NewProviderRegistry()
+	registry.Register(&mockProvider{name: "openai", block: true})
+
+	executor := NewLLMExecutor(registry, WithModel("gpt-4o-mini"), WithTimeout(50*time.Millisecond))
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := executor.Execute("Test prompt", nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected timeout error, got nil")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Execute did not return after timeout")
+	}
+}
+
+func TestLLMExecutor_DefaultTimeout(t *testing.T) {
+	registry := benchmark.NewProviderRegistry()
+	executor := NewLLMExecutor(registry)
+	if executor.timeout != defaultExecuteTimeout {
+		t.Errorf("Expected default timeout %v, got %v", defaultExecuteTimeout, executor.timeout)
 	}
 }
 

@@ -2,9 +2,14 @@ package testing
 
 import (
 	"context"
+	"time"
 
 	"github.com/promptsmith/cli/internal/benchmark"
 )
+
+// defaultExecuteTimeout bounds a single LLM call so a hung provider cannot
+// block a test run indefinitely.
+const defaultExecuteTimeout = 60 * time.Second
 
 // LLMExecutor executes prompts using real LLM providers
 type LLMExecutor struct {
@@ -12,6 +17,7 @@ type LLMExecutor struct {
 	model       string
 	maxTokens   int
 	temperature float64
+	timeout     time.Duration
 }
 
 // LLMExecutorOption configures the LLM executor
@@ -38,6 +44,14 @@ func WithTemperature(temp float64) LLMExecutorOption {
 	}
 }
 
+// WithTimeout sets the per-call timeout for completions. A non-positive value
+// disables the deadline.
+func WithTimeout(timeout time.Duration) LLMExecutorOption {
+	return func(e *LLMExecutor) {
+		e.timeout = timeout
+	}
+}
+
 // NewLLMExecutor creates a new LLM executor
 func NewLLMExecutor(registry *benchmark.ProviderRegistry, opts ...LLMExecutorOption) *LLMExecutor {
 	e := &LLMExecutor{
@@ -45,6 +59,7 @@ func NewLLMExecutor(registry *benchmark.ProviderRegistry, opts ...LLMExecutorOpt
 		model:       "gpt-4o-mini",
 		maxTokens:   1024,
 		temperature: 0.7,
+		timeout:     defaultExecuteTimeout,
 	}
 	for _, opt := range opts {
 		opt(e)
@@ -67,7 +82,14 @@ func (e *LLMExecutor) Execute(renderedPrompt string, inputs map[string]any) (str
 		Variables:   inputs,
 	}
 
-	resp, err := provider.Complete(context.Background(), req)
+	ctx := context.Background()
+	if e.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, e.timeout)
+		defer cancel()
+	}
+
+	resp, err := provider.Complete(ctx, req)
 	if err != nil {
 		return "", err
 	}
