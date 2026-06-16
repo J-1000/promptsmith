@@ -116,6 +116,12 @@ promptsmith benchmark --runs 10
 promptsmith benchmark -o results.json
 ```
 
+Benchmark cost estimates can be overridden with current vendor or account-specific rates:
+
+```bash
+export PROMPTSMITH_MODEL_PRICING='{"gpt-4o":{"input_per_1m":2.50,"output_per_1m":10.00}}'
+```
+
 ### `benchmark compare`
 
 Compare two benchmark result files.

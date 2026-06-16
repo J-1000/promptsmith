@@ -254,6 +254,12 @@ Set API keys via environment variables:
 - `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
 
+Cost estimates use built-in fallback prices when provider APIs return token usage but not spend. To use current vendor or account-specific rates, set `PROMPTSMITH_MODEL_PRICING` to a JSON object keyed by model:
+
+```bash
+export PROMPTSMITH_MODEL_PRICING='{"gpt-4o":{"input_per_1m":2.50,"output_per_1m":10.00},"my-model":{"input_per_1m":1.00,"output_per_1m":2.00}}'
+```
+
 ## Prompt Generation
 
 Generate prompt variations using AI:
