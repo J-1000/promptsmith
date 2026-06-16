@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { listTests, listTestRuns, TestSuite } from '../api'
+import { listTests, listTestRuns } from '../api'
+import { useApi } from '../hooks/useApi'
 import styles from './TestsPage.module.css'
 
 interface FlakinessMap {
@@ -8,40 +9,30 @@ interface FlakinessMap {
 }
 
 export function TestsPage() {
-  const [suites, setSuites] = useState<TestSuite[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { data, loading, error, refetch } = useApi(listTests, [])
+  const suites = data ?? []
   const [search, setSearch] = useState('')
   const [flakiness, setFlakiness] = useState<FlakinessMap>({})
 
   useEffect(() => {
-    listTests()
-      .then((loadedSuites) => {
-        setSuites(loadedSuites)
-        // Fetch run history for each suite to compute flakiness
-        loadedSuites.forEach((suite) => {
-          listTestRuns(suite.name).then((runs) => {
-            if (runs.length >= 2) {
-              const statuses = runs.map(r => r.status)
-              const transitions = statuses.slice(1).filter((s, i) => s !== statuses[i]).length
-              const flakyPct = Math.round((transitions / (statuses.length - 1)) * 100)
-              setFlakiness(prev => ({ ...prev, [suite.name]: flakyPct }))
-            }
-          }).catch(() => { /* ignore errors fetching runs */ })
+    if (!data) return
+    let cancelled = false
+    // Fetch run history for each suite to compute flakiness.
+    data.forEach((suite) => {
+      listTestRuns(suite.name)
+        .then((runs) => {
+          if (cancelled || runs.length < 2) return
+          const statuses = runs.map((r) => r.status)
+          const transitions = statuses.slice(1).filter((s, i) => s !== statuses[i]).length
+          const flakyPct = Math.round((transitions / (statuses.length - 1)) * 100)
+          setFlakiness((prev) => ({ ...prev, [suite.name]: flakyPct }))
         })
-      })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
-
-  const handleRefresh = () => {
-    setLoading(true)
-    setError(null)
-    listTests()
-      .then(setSuites)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }
+        .catch(() => { /* ignore errors fetching runs */ })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [data])
 
   const filtered = suites.filter((s) =>
     s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -79,7 +70,7 @@ export function TestsPage() {
           </div>
           <button
             className={styles.refreshButton}
-            onClick={handleRefresh}
+            onClick={refetch}
             disabled={loading}
             title="Refresh test suites"
           >
