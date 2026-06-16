@@ -2,7 +2,9 @@ package benchmark
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -40,18 +42,21 @@ type CompletionResponse struct {
 
 // ModelPricing defines token pricing for a model
 type ModelPricing struct {
-	InputPer1M  float64 // Cost per 1M input tokens
-	OutputPer1M float64 // Cost per 1M output tokens
+	InputPer1M  float64 `json:"input_per_1m"`  // Cost per 1M input tokens
+	OutputPer1M float64 `json:"output_per_1m"` // Cost per 1M output tokens
 }
 
-// Known model pricing (approximate, as of Feb 2025)
+const modelPricingEnv = "PROMPTSMITH_MODEL_PRICING"
+
+// Fallback model pricing used when provider APIs do not return cost data.
+// Override with PROMPTSMITH_MODEL_PRICING for up-to-date vendor/account rates.
 var modelPricing = map[string]ModelPricing{
 	// OpenAI
-	"gpt-4o":          {InputPer1M: 2.50, OutputPer1M: 10.00},
-	"gpt-4o-mini":     {InputPer1M: 0.15, OutputPer1M: 0.60},
-	"gpt-4-turbo":     {InputPer1M: 10.00, OutputPer1M: 30.00},
-	"o1":              {InputPer1M: 15.00, OutputPer1M: 60.00},
-	"o1-mini":         {InputPer1M: 3.00, OutputPer1M: 12.00},
+	"gpt-4o":      {InputPer1M: 2.50, OutputPer1M: 10.00},
+	"gpt-4o-mini": {InputPer1M: 0.15, OutputPer1M: 0.60},
+	"gpt-4-turbo": {InputPer1M: 10.00, OutputPer1M: 30.00},
+	"o1":          {InputPer1M: 15.00, OutputPer1M: 60.00},
+	"o1-mini":     {InputPer1M: 3.00, OutputPer1M: 12.00},
 	// Anthropic
 	"claude-3-5-sonnet-20241022": {InputPer1M: 3.00, OutputPer1M: 15.00},
 	"claude-sonnet-4-20250514":   {InputPer1M: 3.00, OutputPer1M: 15.00},
@@ -69,17 +74,7 @@ var modelPricing = map[string]ModelPricing{
 
 // CalculateCost calculates the cost for a completion
 func CalculateCost(model string, promptTokens, outputTokens int) float64 {
-	pricing, ok := modelPricing[model]
-	if !ok {
-		// Try prefix matching for versioned models
-		for m, p := range modelPricing {
-			if strings.HasPrefix(model, m) {
-				pricing = p
-				ok = true
-				break
-			}
-		}
-	}
+	pricing, ok := pricingForModel(model)
 	if !ok {
 		return 0 // Unknown model
 	}
@@ -87,6 +82,49 @@ func CalculateCost(model string, promptTokens, outputTokens int) float64 {
 	inputCost := float64(promptTokens) * pricing.InputPer1M / 1_000_000
 	outputCost := float64(outputTokens) * pricing.OutputPer1M / 1_000_000
 	return inputCost + outputCost
+}
+
+func pricingForModel(model string) (ModelPricing, bool) {
+	pricing := effectiveModelPricing()
+	if p, ok := pricing[model]; ok {
+		return p, true
+	}
+
+	var (
+		match        ModelPricing
+		longestMatch int
+	)
+	for name, p := range pricing {
+		if strings.HasPrefix(model, name) && len(name) > longestMatch {
+			match = p
+			longestMatch = len(name)
+		}
+	}
+	return match, longestMatch > 0
+}
+
+func effectiveModelPricing() map[string]ModelPricing {
+	pricing := make(map[string]ModelPricing, len(modelPricing))
+	for model, p := range modelPricing {
+		pricing[model] = p
+	}
+
+	raw := strings.TrimSpace(os.Getenv(modelPricingEnv))
+	if raw == "" {
+		return pricing
+	}
+
+	var overrides map[string]ModelPricing
+	if err := json.Unmarshal([]byte(raw), &overrides); err != nil {
+		return pricing
+	}
+	for model, p := range overrides {
+		if model == "" || p.InputPer1M < 0 || p.OutputPer1M < 0 {
+			continue
+		}
+		pricing[model] = p
+	}
+	return pricing
 }
 
 // GetProviderForModel returns the provider name for a given model

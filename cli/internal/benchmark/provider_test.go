@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"math"
 	"testing"
 )
 
@@ -55,6 +56,36 @@ func TestCalculateCost(t *testing.T) {
 				t.Errorf("CalculateCost() = %v, want between %v and %v", cost, tt.wantMin, tt.wantMax)
 			}
 		})
+	}
+}
+
+func TestCalculateCostUsesMostSpecificPrefix(t *testing.T) {
+	cost := CalculateCost("gpt-4o-mini-2024-07-18", 1000, 500)
+	if math.Abs(cost-0.00045) > 0.0000001 {
+		t.Errorf("CalculateCost() = %v, want 0.00045", cost)
+	}
+}
+
+func TestCalculateCostUsesPricingOverride(t *testing.T) {
+	t.Setenv(modelPricingEnv, `{"custom/model":{"input_per_1m":1.5,"output_per_1m":2.5},"gpt-4o":{"input_per_1m":1,"output_per_1m":1}}`)
+
+	customCost := CalculateCost("custom/model", 1_000_000, 500_000)
+	if math.Abs(customCost-2.75) > 0.0000001 {
+		t.Errorf("CalculateCost(custom/model) = %v, want 2.75", customCost)
+	}
+
+	overriddenCost := CalculateCost("gpt-4o", 1000, 500)
+	if math.Abs(overriddenCost-0.0015) > 0.0000001 {
+		t.Errorf("CalculateCost(gpt-4o) = %v, want 0.0015", overriddenCost)
+	}
+}
+
+func TestCalculateCostIgnoresInvalidPricingOverride(t *testing.T) {
+	t.Setenv(modelPricingEnv, `{"gpt-4o":{"input_per_1m":-1,"output_per_1m":1},"bad":`)
+
+	cost := CalculateCost("gpt-4o", 1000, 500)
+	if cost < 0.007 || cost > 0.008 {
+		t.Errorf("CalculateCost() = %v, want fallback pricing between 0.007 and 0.008", cost)
 	}
 }
 
