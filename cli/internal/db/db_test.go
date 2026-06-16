@@ -1,8 +1,10 @@
 package db
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -68,6 +70,51 @@ func TestOpenEnablesForeignKeys(t *testing.T) {
 
 	if _, err := db.CreatePrompt("missing-project", "orphan", "", "prompts/orphan.prompt"); err == nil {
 		t.Fatal("expected missing project foreign key to fail")
+	}
+}
+
+func TestOpenEnablesWAL(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	var mode string
+	if err := db.QueryRow("PRAGMA journal_mode").Scan(&mode); err != nil {
+		t.Fatalf("failed to read journal_mode pragma: %v", err)
+	}
+	if mode != "wal" {
+		t.Fatalf("journal_mode = %q, want wal", mode)
+	}
+}
+
+func TestConcurrentReadsAndWrites(t *testing.T) {
+	db, _, cleanup := setupTestDB(t)
+	defer cleanup()
+
+	project, err := db.CreateProject("concurrency")
+	if err != nil {
+		t.Fatalf("failed to create project: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 32)
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			name := fmt.Sprintf("prompt-%d", i)
+			if _, err := db.CreatePrompt(project.ID, name, "", "prompts/"+name+".prompt"); err != nil {
+				errs <- err
+				return
+			}
+			if _, err := db.ListPrompts(); err != nil {
+				errs <- err
+			}
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatalf("concurrent operation failed: %v", err)
 	}
 }
 

@@ -149,18 +149,30 @@ func FindProjectRoot() (string, error) {
 	}
 }
 
+// maxOpenConns bounds the connection pool. WAL mode permits concurrent
+// readers alongside a single writer, so the API server can serve overlapping
+// requests instead of serializing every query behind one connection. Write
+// contention is absorbed by the busy_timeout pragma rather than surfacing as
+// "database is locked" errors.
+const maxOpenConns = 8
+
 func Open(projectRoot string) (*DB, error) {
 	dbPath := filepath.Join(projectRoot, ConfigDir, DBFile)
-	sqlDB, err := sql.Open("sqlite3", dbPath)
+	// Pragmas are encoded in the DSN so they apply to every connection in the
+	// pool. Executing PRAGMA on the *sql.DB handle would only configure a
+	// single connection, leaving the rest of the pool with default settings.
+	dsn := dbPath + "?_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_foreign_keys=on"
+	sqlDB, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetMaxIdleConns(maxOpenConns)
+	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	if _, err := sqlDB.Exec("PRAGMA foreign_keys = ON"); err != nil {
+	if err := sqlDB.Ping(); err != nil {
 		sqlDB.Close()
-		return nil, fmt.Errorf("failed to enable foreign keys: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	db := &DB{DB: sqlDB, projectRoot: projectRoot}
