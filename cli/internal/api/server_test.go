@@ -189,6 +189,10 @@ func TestCreatePromptRejectsPathTraversal(t *testing.T) {
 
 	server := NewServer(database, tmpDir)
 
+	outsidePath := filepath.Join(filepath.Dir(tmpDir), "outside.prompt")
+	_ = os.Remove(outsidePath)
+	defer os.Remove(outsidePath)
+
 	body := `{"name":"escape","file_path":"../../outside.prompt","content":"test"}`
 	req := httptest.NewRequest("POST", "/api/prompts", strings.NewReader(body))
 	rec := httptest.NewRecorder()
@@ -199,7 +203,6 @@ func TestCreatePromptRejectsPathTraversal(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
 
-	outsidePath := filepath.Join(filepath.Dir(tmpDir), "outside.prompt")
 	if _, err := os.Stat(outsidePath); !os.IsNotExist(err) {
 		t.Fatalf("outside file should not exist, err=%v", err)
 	}
